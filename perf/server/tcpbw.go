@@ -1,8 +1,8 @@
 package server
 
 import (
+	"../../errors"
 	"fmt"
-	"github.com/adamb/netpupper/errors"
 	"net"
 )
 
@@ -33,6 +33,8 @@ func Client() {
 	p := Header{}
 	pl := IntField{}
 	pl.Write(4)
+
+	p.Base.AddField(pl)
 	pt := IntField{}
 	pt.Write(1)
 	p.PacketLength = &pl

@@ -1,35 +1,24 @@
 package server
 
-import (
-	"encoding/binary"
-	"fmt"
-)
+const PACKETTYPE_LENGTH = 2
 
 /*
-IntField is a fixed-size (2 byte) field.
+Packet base is the common attributes that a slice of a packet has
 */
-type IntField struct {
+type PacketBase struct {
+	Fields []*Field
 	Length uint16
-	Value  uint16
 }
 
-func (f *IntField) Read(b []byte) {
-	fmt.Printf("ptl: %v\n", b)
-	f.Value = binary.BigEndian.Uint16(b)
-}
-func (f *IntField) Write(v uint16) {
-	f.Value = v
-}
-func (f *IntField) Serialize() []byte {
-	b := make([]byte, 2)
-	binary.BigEndian.PutUint16(b, f.Value)
-	return b
+func (pb *PacketBase) AddField(f Field) {
+	pb.Fields = append(pb.Fields, &f)
 }
 
 /*
 Header is the packet header - it defines what type of packet it is and how long it is.
 */
 type Header struct {
+	Base         PacketBase
 	PacketType   *IntField
 	PacketLength *IntField
 }
@@ -45,7 +34,7 @@ func (h *Header) Serialize() []byte {
 func ReadHeader(b []byte) Header {
 	h := Header{}
 	h.PacketType = &IntField{
-		Length: 2,
+		Length: PACKETTYPE_LENGTH,
 	}
 	h.PacketType.Read(b[:2])
 	return h
