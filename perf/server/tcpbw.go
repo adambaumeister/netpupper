@@ -37,8 +37,7 @@ func Client() {
 	p.Base.AddField(pl)
 	pt := IntField{}
 	pt.Write(1)
-	p.PacketLength = &pl
-	p.PacketType = &pt
+	p.Base.AddField(pt)
 
 	b := p.Serialize()
 	_, err = conn.Write(b)
