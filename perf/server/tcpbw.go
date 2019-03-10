@@ -34,10 +34,10 @@ func Client() {
 	pl := IntField{}
 	pl.Write(4)
 
-	p.Base.AddField(pl)
+	p.AddField(&pl)
 	pt := IntField{}
 	pt.Write(1)
-	p.Base.AddField(pt)
+	p.AddField(&pt)
 
 	b := p.Serialize()
 	_, err = conn.Write(b)
