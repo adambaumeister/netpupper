@@ -25,7 +25,6 @@ func (f *IntField) Read(b []byte) {
 	f.Value = binary.BigEndian.Uint16(b)
 }
 func (f *IntField) Write(v uint16) {
-	// There must b
 	f.Value = v
 }
 func (f *IntField) Serialize() []byte {

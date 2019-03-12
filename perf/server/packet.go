@@ -1,26 +1,52 @@
 package server
 
-import "fmt"
+import (
+	"encoding/binary"
+	"github.com/adamb/netpupper/errors"
+	"net"
+)
 
 const OPEN_TYPE = 1
+const CONFIRM_TYPE = 2
 
 const PACKETTYPE_LENGTH = 2
 const PACKETLEN_LENGTH = 2
 
+const OPEN_LENGTH = 8
+
+type Packet struct {
+	Header  *Header
+	Message Message
+}
+
+func (p *Packet) Serialize() []byte {
+	b := []byte{}
+	b = append(b, p.Header.Serialize()...)
+	b = append(b, p.Message.Serialize()...)
+	return b
+}
+
 /*
-Packet base is the common attributes that a slice of a packet has
+Message methods
 */
-type PacketBase struct {
-	Fields []Field
-	Length uint16
+type Message interface {
+	Serialize() []byte
 }
 
-func (pb *PacketBase) AddField(f Field) {
-	pb.Fields = append(pb.Fields, f)
+/*
+Open message, used to initiate a transfer
+*/
+type Open struct {
+	DataLength uint64
 }
 
-func (pb *PacketBase) GetFields() []Field {
-	return pb.Fields
+func (m *Open) Serialize() []byte {
+	b := make([]byte, 8)
+	binary.BigEndian.PutUint64(b, m.DataLength)
+	return b
+}
+func (m *Open) Write(i uint64) {
+	m.DataLength = i
 }
 
 /*
@@ -44,16 +70,84 @@ func (h *Header) Serialize() []byte {
 
 	return b
 }
-func ReadHeader(b []byte) Header {
+func ReadHeader(c net.Conn) Header {
 	h := Header{}
+	var b = make([]byte, 4)
+	_, err := c.Read(b)
+	errors.CheckError(err)
 	h.PacketType = &IntField{
 		Length: PACKETTYPE_LENGTH,
 	}
 	h.PacketLength = &IntField{
 		Length: PACKETLEN_LENGTH,
 	}
-	fmt.Printf("DEEBUG: %v\n", b)
-	h.PacketType.Read(b[:2])
-	h.PacketLength.Read(b[2:4])
+	h.PacketLength.Read(b[:2])
+	h.PacketType.Read(b[2:4])
 	return h
+}
+
+func ReadOpen(c net.Conn) Open {
+	var b = make([]byte, OPEN_LENGTH)
+	_, err := c.Read(b)
+	errors.CheckError(err)
+	o := Open{}
+	o.DataLength = binary.BigEndian.Uint64(b[:8])
+	return o
+}
+
+func ReadData(conn net.Conn, l uint64) []byte {
+	var b = make([]byte, l)
+	_, err := conn.Read(b)
+	errors.CheckError(err)
+	return b
+}
+
+func ReadPacket(conn net.Conn) Packet {
+	h := ReadHeader(conn)
+
+	p := Packet{}
+	p.Header = &h
+	switch {
+	case p.Header.PacketType.Value == OPEN_TYPE:
+		o := ReadOpen(conn)
+		p.Message = &o
+	}
+
+	return p
+}
+
+func SendOpen(conn net.Conn) {
+	h := Header{}
+	pl := IntField{}
+	pl.Write(4)
+
+	h.AddField(&pl)
+	pt := IntField{}
+	pt.Write(OPEN_TYPE)
+	h.AddField(&pt)
+	p := Packet{}
+
+	p.Header = &h
+	msg := Open{}
+	msg.Write(65535)
+
+	p.Message = &msg
+	b := p.Serialize()
+	_, err := conn.Write(b)
+	errors.CheckError(err)
+}
+
+func SendConfirm(conn net.Conn) {
+	p := Header{}
+	pl := IntField{}
+	pl.Write(4)
+
+	p.AddField(&pl)
+	pt := IntField{}
+	pt.Write(CONFIRM_TYPE)
+	p.AddField(&pt)
+
+	b := p.Serialize()
+	_, err := conn.Write(b)
+	errors.CheckError(err)
 }

@@ -1,8 +1,8 @@
 package server
 
 import (
-	"../../errors"
 	"fmt"
+	"github.com/adamb/netpupper/errors"
 	"net"
 )
 
@@ -13,14 +13,18 @@ func Server() {
 	}
 	for {
 		conn, err := ln.Accept()
-		if err != nil {
-			errors.RaiseError("Failed to receive connection")
-		}
-		var b = make([]byte, 4)
-		_, err = conn.Read(b)
-		h := ReadHeader(b)
 		errors.CheckError(err)
-		fmt.Printf("Got a connection from: %v, Packet Type: %v\n", conn.RemoteAddr(), h.PacketType.Value)
+
+		h := ReadHeader(conn)
+		SendConfirm(conn)
+		switch {
+		case h.PacketType.Value == OPEN_TYPE:
+			var o = Open{}
+			o = ReadOpen(conn)
+			fmt.Printf("Got a connection from: %v, Packet Type: %v Data to follow: %v bytes\n", conn.RemoteAddr(),
+				h.PacketType.Value, o.DataLength)
+
+		}
 	}
 }
 
@@ -30,16 +34,13 @@ func Client() {
 		errors.RaiseError("Failed to open connection!")
 	}
 	fmt.Printf("Succesfully connected to: %v\n", conn.RemoteAddr())
-	p := Header{}
-	pl := IntField{}
-	pl.Write(4)
 
-	p.AddField(&pl)
-	pt := IntField{}
-	pt.Write(1)
-	p.AddField(&pt)
-
-	b := p.Serialize()
-	_, err = conn.Write(b)
-	errors.CheckError(err)
+	// Send the open message, request to start
+	SendOpen(conn)
+	// Wait for a confirmation
+	h := ReadHeader(conn)
+	switch {
+	case h.PacketType.Value == CONFIRM_TYPE:
+		fmt.Printf("OPEN Request confirmed.")
+	}
 }
