@@ -1,6 +1,7 @@
 package server
 
 import (
+	"encoding/binary"
 	"fmt"
 	"github.com/adamb/netpupper/errors"
 	"net"
@@ -16,14 +17,17 @@ func Server() {
 		errors.CheckError(err)
 
 		h := ReadHeader(conn)
-		SendConfirm(conn)
 		switch {
 		case h.PacketType.Value == OPEN_TYPE:
 			var o = Open{}
 			o = ReadOpen(conn)
 			fmt.Printf("Got a connection from: %v, Packet Type: %v Data to follow: %v bytes\n", conn.RemoteAddr(),
 				h.PacketType.Value, o.DataLength)
+			SendConfirm(conn)
 
+			data := make([]byte, o.DataLength)
+			conn.Read(data)
+			fmt.Printf("Value: %v\n", binary.BigEndian.Uint32(data))
 		}
 	}
 }
@@ -41,6 +45,7 @@ func Client() {
 	h := ReadHeader(conn)
 	switch {
 	case h.PacketType.Value == CONFIRM_TYPE:
-		fmt.Printf("OPEN Request confirmed.")
+		fmt.Printf("OPEN Request confirmed. Sending data...\n")
+		conn.Write([]byte{255, 255, 255, 255})
 	}
 }

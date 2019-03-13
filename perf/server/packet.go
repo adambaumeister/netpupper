@@ -129,7 +129,7 @@ func SendOpen(conn net.Conn) {
 
 	p.Header = &h
 	msg := Open{}
-	msg.Write(65535)
+	msg.Write(4)
 
 	p.Message = &msg
 	b := p.Serialize()
