@@ -1,10 +1,10 @@
 package server
 
 import (
-	"encoding/binary"
 	"fmt"
 	"github.com/adamb/netpupper/errors"
 	"net"
+	"time"
 )
 
 func Server() {
@@ -25,9 +25,7 @@ func Server() {
 				h.PacketType.Value, o.DataLength)
 			SendConfirm(conn)
 
-			data := make([]byte, o.DataLength)
-			conn.Read(data)
-			fmt.Printf("Value: %v\n", binary.BigEndian.Uint32(data))
+			timedRead(conn, o.DataLength)
 		}
 	}
 }
@@ -46,6 +44,33 @@ func Client() {
 	switch {
 	case h.PacketType.Value == CONFIRM_TYPE:
 		fmt.Printf("OPEN Request confirmed. Sending data...\n")
-		conn.Write([]byte{255, 255, 255, 255})
+		// Test by splitting up the data
+		conn.Write([]byte{255, 255})
+		time.Sleep(2 * time.Second)
+		conn.Write([]byte{255, 255})
+		time.Sleep(1 * time.Second)
 	}
+}
+
+func timedRead(conn net.Conn, rl uint64) {
+	start := time.Now().UnixNano()
+
+	// Chunk size is how much we read at each time interval
+	chunk := rl / 4
+	data := make([]byte, rl)
+
+	currentChunk := 1
+	// Read each chunk until we've read the entire thing
+	for currentChunk <= 4 {
+		chunkData := make([]byte, chunk)
+		conn.Read(chunkData)
+		fmt.Printf("Chunkdat: %v\n", chunkData)
+		// Append each read chunk to the full data array
+		data = append(data, chunkData...)
+		currentChunk = currentChunk + 1
+	}
+	t := time.Now().UnixNano()
+	elapsed := t - start
+	fmt.Printf("Read took %v ns\n", elapsed)
+
 }
