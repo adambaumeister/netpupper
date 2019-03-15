@@ -1,7 +1,6 @@
 package tcpbw
 
 import (
-	"flag"
 	"fmt"
 	"github.com/adamb/netpupper/errors"
 	"gopkg.in/yaml.v2"
@@ -29,6 +28,7 @@ type ServerConfig struct {
 
 /*
 Configure the TCPBW Server
+Returns TRUE if this method matches the requested config
 */
 func (s *Server) Configure() {
 	serverFile := "./server.yml"
@@ -42,18 +42,9 @@ func (s *Server) Configure() {
 		err = yaml.Unmarshal(data, s.Config)
 		errors.CheckError(err)
 	}
-
-	// CMDLINE Args
-	if s.Config.Address == "" {
-		s.Config.Address = *flag.String("address", ":8080", "Address to bind server daemon to.")
-		flag.Parse()
-	}
-
 }
 
 func (s *Server) Run() {
-	s.Configure()
-	fmt.Printf("DEBUG: %v\n", s.Config)
 	ln, err := net.Listen("tcp", s.Config.Address)
 	if err != nil {
 		errors.RaiseError("Failed to open socket.")
@@ -90,6 +81,7 @@ type clientConfig struct {
 
 /*
 Configure the TCPBW Client
+Returns TRUE if a client mode is requested
 */
 func (c *Client) Configure() {
 	f := "./client.yml"
@@ -103,17 +95,9 @@ func (c *Client) Configure() {
 		err = yaml.Unmarshal(data, c.Config)
 		errors.CheckError(err)
 	}
-
-	// CMDLINE Args
-	if c.Config.Server == "" {
-		c.Config.Server = *flag.String("server", "127.0.0.1:8080", "Netpupper server to connect to.")
-		flag.Parse()
-	}
-
 }
 
 func (c *Client) Run() {
-	c.Configure()
 	conn, err := net.Dial("tcp", c.Config.Server)
 	if err != nil {
 		errors.RaiseError("Failed to open connection!")
