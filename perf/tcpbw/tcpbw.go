@@ -62,7 +62,10 @@ func (s *Server) Run() {
 				h.PacketType.Value, o.DataLength)
 			SendConfirm(conn)
 
-			timedRead(conn, o.DataLength)
+			notifyChannel := make(chan bool)
+			go timedRead(conn, o.DataLength, notifyChannel)
+			time.Sleep(500 * time.Millisecond)
+			notifyChannel <- true
 		}
 	}
 }
@@ -119,7 +122,7 @@ func (c *Client) Run() {
 	}
 }
 
-func timedRead(conn net.Conn, rl uint64) {
+func timedRead(conn net.Conn, rl uint64, nc chan bool) {
 	start := time.Now().UnixNano()
 
 	// Chunk size is how much we read at each time interval
@@ -130,7 +133,16 @@ func timedRead(conn net.Conn, rl uint64) {
 	// Read each chunk until we've read the entire thing
 	for currentChunk <= 4 {
 		chunkData := make([]byte, chunk)
-		conn.Read(chunkData)
+
+		rc := make(chan bool)
+		go basicRead(conn, chunkData, rc)
+		select {
+		case _ = <-rc:
+			fmt.Printf("Read chunk\n")
+		case _ = <-nc:
+			fmt.Printf("Notify requested...\n")
+		}
+
 		// Append each read chunk to the full data array
 		data = append(data, chunkData...)
 		currentChunk = currentChunk + 1
@@ -139,4 +151,9 @@ func timedRead(conn net.Conn, rl uint64) {
 	elapsed := t - start
 	fmt.Printf("Read took %v ns\n", elapsed)
 
+}
+
+func basicRead(conn net.Conn, data []byte, c chan bool) {
+	conn.Read(data)
+	c <- true
 }
