@@ -1,11 +1,25 @@
 package main
 
 import (
-	"github.com/adamb/netpupper/perf/server"
+	"flag"
+	"github.com/adamb/netpupper/perf/tcpbw"
 )
 
 func main() {
-	go server.Server()
-	server.Client()
+	r := ParseArgs()
+	r.Run()
+}
 
+/*
+Parse the cmdline args to determine what mode to run in
+*/
+func ParseArgs() tcpbw.Runner {
+	serverMode := flag.Bool("server", false, "a bool")
+	if *serverMode {
+		s := &tcpbw.Server{}
+		return s
+	} else {
+		c := &tcpbw.Client{}
+		return c
+	}
 }
