@@ -116,7 +116,7 @@ func ReadPacket(conn net.Conn) Packet {
 	return p
 }
 
-func SendOpen(conn net.Conn) {
+func SendOpen(conn net.Conn, dl uint64) {
 	h := Header{}
 	pl := IntField{}
 	pl.Write(4)
@@ -129,7 +129,7 @@ func SendOpen(conn net.Conn) {
 
 	p.Header = &h
 	msg := Open{}
-	msg.Write(4)
+	msg.Write(dl)
 
 	p.Message = &msg
 	b := p.Serialize()
