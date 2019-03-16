@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"fmt"
 	"github.com/adamb/netpupper/errors"
+	"github.com/adamb/netpupper/perf"
 	"gopkg.in/yaml.v2"
 	"io/ioutil"
 	"net"
@@ -145,7 +146,7 @@ func (c *Client) Run() {
 	}
 	fmt.Printf("Succesfully connected to: %v\n", conn.RemoteAddr())
 
-	dl := uint64(ConvertByteDec(c.Config.Bytes))
+	dl := uint64(StringToByte(c.Config.Bytes))
 	// Send the open message, request to start
 	SendOpen(conn, dl)
 	// Wait for a confirmation
@@ -191,9 +192,9 @@ func timedRead(conn net.Conn, rl uint64, nc chan bool, sc chan bool) {
 				cbps = float64(chunk) / float64(e)
 				// Convert from nano to reg seconds
 				cbps = cbps * 1000000000
-				fmt.Printf("time: %v, BPS: %v, chunk: %v\n", e, int(cbps), int(chunk))
+				//fmt.Printf("time: %v, BPS: %v, chunk: %v\n", e, int(cbps), int(chunk))
 			}
-			fmt.Printf("Read chunk at %v BPS\n", cbps)
+			//fmt.Printf("Read chunk at %v BPS\n", ByteToString(uint64(cbps)))
 			// Set the last time to the time of this chunk's finished read
 			lt = t
 		case _ = <-nc:
@@ -206,8 +207,11 @@ func timedRead(conn net.Conn, rl uint64, nc chan bool, sc chan bool) {
 		currentChunk = currentChunk + 1
 	}
 	t := time.Now().UnixNano()
-	elapsed := t - start
-	fmt.Printf("Read took %v ns\n", elapsed)
+	e := uint64(t - start)
+	cbps := float64(rl) / float64(e)
+	// Convert from nano to reg seconds
+	cbps = cbps * 1000000000
+	fmt.Printf("RCV: %v Bps\n", ByteToString(uint64(cbps)))
 	sc <- true
 	return
 }
@@ -224,16 +228,27 @@ Convert a string with a byte delimiter to a byte len
 	1M = 1000000
 	etc..
 */
-func ConvertByteDec(s string) uint64 {
+func StringToByte(s string) uint64 {
 	sl := len(s)
 	switch string(s[sl-1]) {
 	case "M":
 		v, _ := strconv.Atoi(s[:sl-1])
-		return uint64(v * 1000000)
+		return uint64(v * perf.MEGABYTE)
 	case "G":
 		v, _ := strconv.Atoi(s[:sl-1])
-		return uint64(v * 1000000000)
+		return uint64(v * perf.GIGABYTE)
 	default:
 		return 1
+	}
+}
+
+func ByteToString(b uint64) string {
+	switch {
+	case b > perf.GIGABYTE:
+		return fmt.Sprintf("%vG", b/perf.GIGABYTE)
+	case b > perf.MEGABYTE:
+		return fmt.Sprintf("%vM", b/perf.MEGABYTE)
+	default:
+		return string(b)
 	}
 }

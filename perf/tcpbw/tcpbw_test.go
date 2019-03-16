@@ -21,8 +21,10 @@ func TestTcpbw(t *testing.T) {
 
 }
 
-func TestConvertByteDec(t *testing.T) {
-	s := "20M"
-	r := ConvertByteDec(s)
-	fmt.Printf("ConvertByteDec: %v:%v\n\n", s, r)
+func TestStringToByte(t *testing.T) {
+	s := "20G"
+	r := StringToByte(s)
+	fmt.Printf("StringToByte: %v:%v\n\n", s, r)
+	back := ByteToString(r)
+	fmt.Printf("ByteToString: %v:%v\n\n", r, back)
 }
