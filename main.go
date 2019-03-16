@@ -24,10 +24,12 @@ func ParseArgs() tcpbw.Runner {
 	c.Configure()
 	// CMDLINE Args
 	addr := flag.String("address", ":8080", "Address to bind server daemon OR server address to test against.")
+	bytes := flag.String("bytes", "1G", "Total bytes to send.")
 
 	flag.Parse()
 	s.Config.Address = *addr
 	c.Config.Server = *addr
+	c.Config.Bytes = *bytes
 
 	if *clientMode {
 		fmt.Printf("Started in CLIENT mode")

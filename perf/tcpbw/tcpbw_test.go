@@ -1,6 +1,7 @@
 package tcpbw
 
 import (
+	"fmt"
 	"testing"
 )
 
@@ -18,4 +19,10 @@ func TestTcpbw(t *testing.T) {
 
 	c.Run()
 
+}
+
+func TestConvertByteDec(t *testing.T) {
+	s := "20M"
+	r := ConvertByteDec(s)
+	fmt.Printf("ConvertByteDec: %v:%v\n\n", s, r)
 }

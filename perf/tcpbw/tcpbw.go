@@ -9,6 +9,7 @@ import (
 	"io/ioutil"
 	"net"
 	"os"
+	"strconv"
 	"time"
 )
 
@@ -74,6 +75,7 @@ func (s *Server) Run() {
 
 			go timedRead(conn, o.DataLength, s.notifyChan, s.stopChan)
 			s.GetUserInput()
+			conn.Close()
 		}
 	}
 }
@@ -115,12 +117,12 @@ type Client struct {
 
 type clientConfig struct {
 	Server string
-	Bytes  uint64
+	Bytes  string
 }
 
 /*
 Configure the TCPBW Client
-Returns TRUE if a client mode is requested
+Configuration can set external to this function, however, should be done after this call.
 */
 func (c *Client) Configure() {
 	f := "./client.yml"
@@ -143,7 +145,7 @@ func (c *Client) Run() {
 	}
 	fmt.Printf("Succesfully connected to: %v\n", conn.RemoteAddr())
 
-	dl := uint64(1000000000)
+	dl := uint64(ConvertByteDec(c.Config.Bytes))
 	// Send the open message, request to start
 	SendOpen(conn, dl)
 	// Wait for a confirmation
@@ -169,7 +171,6 @@ func timedRead(conn net.Conn, rl uint64, nc chan bool, sc chan bool) {
 	lt := start
 	// Chunk size is how much we read at each time interval
 	chunk := rl / 4
-	data := make([]byte, rl)
 
 	currentChunk := 1
 	// Read each chunk until we've read the entire thing
@@ -200,17 +201,39 @@ func timedRead(conn net.Conn, rl uint64, nc chan bool, sc chan bool) {
 		}
 
 		// Append each read chunk to the full data array
-		data = append(data, chunkData...)
+		// Don't do this, obviously it fills ya data up fam
+		//data = append(data, chunkData...)
 		currentChunk = currentChunk + 1
 	}
 	t := time.Now().UnixNano()
 	elapsed := t - start
 	fmt.Printf("Read took %v ns\n", elapsed)
 	sc <- true
-
+	return
 }
 
 func basicRead(conn net.Conn, data []byte, c chan bool) {
 	conn.Read(data)
 	c <- true
+	return
+}
+
+/*
+Convert a string with a byte delimiter to a byte len
+	1K = 1000
+	1M = 1000000
+	etc..
+*/
+func ConvertByteDec(s string) uint64 {
+	sl := len(s)
+	switch string(s[sl-1]) {
+	case "M":
+		v, _ := strconv.Atoi(s[:sl-1])
+		return uint64(v * 1000000)
+	case "G":
+		v, _ := strconv.Atoi(s[:sl-1])
+		return uint64(v * 1000000000)
+	default:
+		return 1
+	}
 }
