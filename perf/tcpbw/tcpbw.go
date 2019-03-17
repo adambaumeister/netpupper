@@ -11,7 +11,6 @@ import (
 	"io/ioutil"
 	"net"
 	"os"
-	"strconv"
 	"strings"
 	"time"
 )
@@ -76,10 +75,14 @@ func (s *Server) Run() {
 				h.PacketType.Value, o.DataLength)
 			SendConfirm(conn)
 
+			// Initilize a test for storing the results
 			test := stats.InitTest()
 			go timedRead(conn, o.DataLength, test.InMsgs, s.stopChan)
 			s.GetUserInput()
 			conn.Close()
+			// End the test and print the summary
+			test.End()
+			test.Summary()
 		}
 	}
 }
@@ -154,7 +157,7 @@ func (c *Client) Run() {
 	c.stopChan = make(chan bool)
 	c.notifyChan = make(chan bool)
 
-	dl := uint64(StringToByte(c.Config.Bytes))
+	dl := uint64(perf.StringToByte(c.Config.Bytes))
 	if dl < perf.MEGABYTE {
 		errors.RaiseError("Error: passed byte count too small!")
 	}
@@ -182,11 +185,11 @@ func (c *Client) Run() {
 
 /*
 TimedRead implements a timed read of rl bytes from conn net.Conn
-It uses a chan (NC: NotifyChannel) to listen for requests for stats.
+It uses a chan (NC: NotifyChannel) to send stats.
 It also uses a chan to signal the running function that it's done
 To allow this to be a a part of the read flow, this method splits the receipt of data into discrete chunks.
 */
-func timedRead(conn net.Conn, rl uint64, nc chan string, sc chan bool) {
+func timedRead(conn net.Conn, rl uint64, nc chan stats.TestResult, sc chan bool) {
 	start := time.Now().UnixNano()
 	fmt.Printf("Read start: %v\n", start)
 	lt := start
@@ -202,7 +205,6 @@ func timedRead(conn net.Conn, rl uint64, nc chan string, sc chan bool) {
 		go basicRead(conn, chunkData, rc)
 
 		var e uint64
-		var cbps float64
 		select {
 		case _ = <-rc:
 			// Read the current time
@@ -212,10 +214,12 @@ func timedRead(conn net.Conn, rl uint64, nc chan string, sc chan bool) {
 
 			if e > 0 {
 				// Bytes transferred per nanosecond
-				cbps = float64(chunk) / float64(e)
-				// Convert from nano to reg seconds
-				cbps = cbps * 1000000000
-				nc <- fmt.Sprintf("time: %v, BPS: %v, chunk: %v\n", e, int(cbps), int(chunk))
+				tr := stats.TestResult{
+					Bytes:   chunk,
+					Elapsed: e,
+				}
+				// Send the result to the given notify channel as type stats.TestResuly
+				nc <- tr
 			}
 			//fmt.Printf("Read chunk at %v BPS\n", ByteToString(uint64(cbps)))
 			// Set the last time to the time of this chunk's finished read
@@ -228,12 +232,6 @@ func timedRead(conn net.Conn, rl uint64, nc chan string, sc chan bool) {
 
 		currentChunk = currentChunk + uint64(chunk)
 	}
-	t := time.Now().UnixNano()
-	e := uint64(t - start)
-	cbps := float64(rl) / float64(e)
-	// Convert from nano to reg seconds
-	cbps = cbps * 1000000000
-	fmt.Printf("RX: %v Bps\n", ByteToString(uint64(cbps)))
 	sc <- true
 	return
 }
@@ -291,7 +289,7 @@ func timedSend(conn net.Conn, sl uint64, nc chan bool, sc chan bool) {
 	// Convert from nano to reg seconds
 	cbps = cbps * 1000000000
 	// TX and RX will be slightly different as the timing here does not include the time the last chunk is read.
-	fmt.Printf("TX: %v Bps\n", ByteToString(uint64(cbps)))
+	fmt.Printf("TX: %v Bps\n", perf.ByteToString(uint64(cbps)))
 	//sc <- true
 	return
 }
@@ -306,35 +304,4 @@ func basicWrite(conn net.Conn, data []byte, c chan bool) {
 	conn.Write(data)
 	c <- true
 	return
-}
-
-/*
-Convert a string with a byte delimiter to a byte len
-	1K = 1000
-	1M = 1000000
-	etc..
-*/
-func StringToByte(s string) uint64 {
-	sl := len(s)
-	switch string(s[sl-1]) {
-	case "M":
-		v, _ := strconv.Atoi(s[:sl-1])
-		return uint64(v * perf.MEGABYTE)
-	case "G":
-		v, _ := strconv.Atoi(s[:sl-1])
-		return uint64(v * perf.GIGABYTE)
-	default:
-		return 1
-	}
-}
-
-func ByteToString(b uint64) string {
-	switch {
-	case b > perf.GIGABYTE:
-		return fmt.Sprintf("%vG", b/perf.GIGABYTE)
-	case b > perf.MEGABYTE:
-		return fmt.Sprintf("%vM", b/perf.MEGABYTE)
-	default:
-		return string(b)
-	}
 }
