@@ -6,11 +6,13 @@ import (
 	"fmt"
 	"github.com/adamb/netpupper/errors"
 	"github.com/adamb/netpupper/perf"
+	"github.com/adamb/netpupper/perf/stats"
 	"gopkg.in/yaml.v2"
 	"io/ioutil"
 	"net"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -74,7 +76,8 @@ func (s *Server) Run() {
 				h.PacketType.Value, o.DataLength)
 			SendConfirm(conn)
 
-			go timedRead(conn, o.DataLength, s.notifyChan, s.stopChan)
+			test := stats.InitTest()
+			go timedRead(conn, o.DataLength, test.InMsgs, s.stopChan)
 			s.GetUserInput()
 			conn.Close()
 		}
@@ -90,16 +93,22 @@ func (s *Server) GetUserInput() {
 		go func() {
 			reader := bufio.NewReader(os.Stdin)
 			s, _ := reader.ReadString('\n')
-			fmt.Printf("Got input\n")
+
+			s = strings.TrimSuffix(s, "\n")
+			s = strings.TrimSuffix(s, "\r")
 			tc <- s
 		}()
 
 		// This part here WILL block.
+		var str string
 		select {
 		// If we get user input
-		case <-tc:
-			fmt.Printf("Stats requested.\n")
-			s.notifyChan <- true
+		case str = <-tc:
+			switch str {
+			case "stats":
+				fmt.Printf("Stats requested.\n")
+				s.notifyChan <- true
+			}
 		// If we get signalled to stop
 		case <-s.stopChan:
 			fmt.Printf("finished input scanning\n")
@@ -165,6 +174,7 @@ func (c *Client) Run() {
 		// Test by splitting up the data
 		b := make([]byte, dl)
 		rand.Read(b)
+
 		timedSend(conn, dl, c.notifyChan, c.stopChan)
 		return
 	}
@@ -176,7 +186,7 @@ It uses a chan (NC: NotifyChannel) to listen for requests for stats.
 It also uses a chan to signal the running function that it's done
 To allow this to be a a part of the read flow, this method splits the receipt of data into discrete chunks.
 */
-func timedRead(conn net.Conn, rl uint64, nc chan bool, sc chan bool) {
+func timedRead(conn net.Conn, rl uint64, nc chan string, sc chan bool) {
 	start := time.Now().UnixNano()
 	fmt.Printf("Read start: %v\n", start)
 	lt := start
@@ -190,25 +200,26 @@ func timedRead(conn net.Conn, rl uint64, nc chan bool, sc chan bool) {
 
 		rc := make(chan bool)
 		go basicRead(conn, chunkData, rc)
+
+		var e uint64
+		var cbps float64
 		select {
 		case _ = <-rc:
 			// Read the current time
 			t := time.Now().UnixNano()
 			// Get the elapsed from the last chunk time
-			e := uint64(t - lt)
-			var cbps float64
+			e = uint64(t - lt)
+
 			if e > 0 {
 				// Bytes transferred per nanosecond
 				cbps = float64(chunk) / float64(e)
 				// Convert from nano to reg seconds
 				cbps = cbps * 1000000000
-				//fmt.Printf("time: %v, BPS: %v, chunk: %v\n", e, int(cbps), int(chunk))
+				nc <- fmt.Sprintf("time: %v, BPS: %v, chunk: %v\n", e, int(cbps), int(chunk))
 			}
 			//fmt.Printf("Read chunk at %v BPS\n", ByteToString(uint64(cbps)))
 			// Set the last time to the time of this chunk's finished read
 			lt = t
-		case _ = <-nc:
-			fmt.Printf("Notify requested...\n")
 		}
 
 		// Append each read chunk to the full data array
@@ -241,18 +252,22 @@ func timedSend(conn net.Conn, sl uint64, nc chan bool, sc chan bool) {
 
 	currentChunk := uint64(0)
 	// Read each chunk until we've read the entire thing
+	var e uint64
+	var cbps float64
+
 	for currentChunk < sl {
 		chunkData := make([]byte, chunk)
 		rand.Read(chunkData)
 		rc := make(chan bool)
 		go basicWrite(conn, chunkData, rc)
 		select {
+		case _ = <-nc:
+			fmt.Printf("Stats: time: %v, BPS: %v, chunk: %v\n", e, int(cbps), int(chunk))
 		case _ = <-rc:
 			// Read the current time
 			t := time.Now().UnixNano()
 			// Get the elapsed from the last chunk time
-			e := uint64(t - lt)
-			var cbps float64
+			e = uint64(t - lt)
 			if e > 0 {
 				// Bytes transferred per nanosecond
 				cbps = float64(chunk) / float64(e)
@@ -263,8 +278,6 @@ func timedSend(conn net.Conn, sl uint64, nc chan bool, sc chan bool) {
 			//fmt.Printf("Read chunk at %v BPS\n", ByteToString(uint64(cbps)))
 			// Set the last time to the time of this chunk's finished read
 			lt = t
-		case _ = <-nc:
-			fmt.Printf("Notify requested...\n")
 		}
 
 		// Append each read chunk to the full data array
@@ -273,8 +286,8 @@ func timedSend(conn net.Conn, sl uint64, nc chan bool, sc chan bool) {
 		currentChunk = currentChunk + uint64(chunk)
 	}
 	t := time.Now().UnixNano()
-	e := uint64(t - start)
-	cbps := float64(sl) / float64(e)
+	e = uint64(t - start)
+	cbps = float64(sl) / float64(e)
 	// Convert from nano to reg seconds
 	cbps = cbps * 1000000000
 	// TX and RX will be slightly different as the timing here does not include the time the last chunk is read.
