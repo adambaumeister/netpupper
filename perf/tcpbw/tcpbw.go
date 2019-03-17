@@ -177,11 +177,11 @@ func timedRead(conn net.Conn, rl uint64, nc chan bool, sc chan bool) {
 	fmt.Printf("Read start: %v\n", start)
 	lt := start
 	// Chunk size is how much we read at each time interval
-	chunk := rl / 4
+	chunk := perf.MEGABYTE
 
-	currentChunk := 1
+	currentChunk := uint64(0)
 	// Read each chunk until we've read the entire thing
-	for currentChunk <= 4 {
+	for currentChunk < rl {
 		chunkData := make([]byte, chunk)
 
 		rc := make(chan bool)
@@ -208,9 +208,10 @@ func timedRead(conn net.Conn, rl uint64, nc chan bool, sc chan bool) {
 		}
 
 		// Append each read chunk to the full data array
-		// Don't do this, obviously it fills ya data up fam
+		// Don't do this, obviously it fills ya memory up fam
 		//data = append(data, chunkData...)
-		currentChunk = currentChunk + 1
+
+		currentChunk = currentChunk + uint64(chunk)
 	}
 	t := time.Now().UnixNano()
 	e := uint64(t - start)
@@ -231,12 +232,12 @@ To allow this to be a a part of the read flow, this method splits the receipt of
 func timedSend(conn net.Conn, sl uint64, nc chan bool, sc chan bool) {
 	start := time.Now().UnixNano()
 	lt := start
-	// Chunk size is how much we send per time interval
-	chunk := sl / 4
+	// Chunk size is how much we read at each time interval
+	chunk := perf.MEGABYTE
 
-	currentChunk := 1
+	currentChunk := uint64(0)
 	// Read each chunk until we've read the entire thing
-	for currentChunk <= 4 {
+	for currentChunk < sl {
 		chunkData := make([]byte, chunk)
 		rand.Read(chunkData)
 		rc := make(chan bool)
@@ -265,7 +266,7 @@ func timedSend(conn net.Conn, sl uint64, nc chan bool, sc chan bool) {
 		// Append each read chunk to the full data array
 		// Don't do this, obviously it fills ya data up fam
 		//data = append(data, chunkData...)
-		currentChunk = currentChunk + 1
+		currentChunk = currentChunk + uint64(chunk)
 	}
 	t := time.Now().UnixNano()
 	e := uint64(t - start)
