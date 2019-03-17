@@ -144,13 +144,17 @@ func (c *Client) Configure() {
 func (c *Client) Run() {
 	c.stopChan = make(chan bool)
 	c.notifyChan = make(chan bool)
+
+	dl := uint64(StringToByte(c.Config.Bytes))
+	if dl < perf.MEGABYTE {
+		errors.RaiseError("Error: passed byte count too small!")
+	}
 	conn, err := net.Dial("tcp", c.Config.Server)
 	if err != nil {
 		errors.RaiseError("Failed to open connection!")
 	}
 	fmt.Printf("Succesfully connected to: %v\n", conn.RemoteAddr())
 
-	dl := uint64(StringToByte(c.Config.Bytes))
 	// Send the open message, request to start
 	SendOpen(conn, dl)
 	// Wait for a confirmation
