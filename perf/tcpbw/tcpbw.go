@@ -113,7 +113,9 @@ func (s *Server) GetUserInput() {
 TCPBW Client struct
 */
 type Client struct {
-	Config *clientConfig
+	notifyChan chan bool
+	stopChan   chan bool
+	Config     *clientConfig
 }
 
 type clientConfig struct {
@@ -140,6 +142,8 @@ func (c *Client) Configure() {
 }
 
 func (c *Client) Run() {
+	c.stopChan = make(chan bool)
+	c.notifyChan = make(chan bool)
 	conn, err := net.Dial("tcp", c.Config.Server)
 	if err != nil {
 		errors.RaiseError("Failed to open connection!")
@@ -157,7 +161,8 @@ func (c *Client) Run() {
 		// Test by splitting up the data
 		b := make([]byte, dl)
 		rand.Read(b)
-		conn.Write(b)
+		timedSend(conn, dl, c.notifyChan, c.stopChan)
+		return
 	}
 }
 
@@ -169,6 +174,7 @@ To allow this to be a a part of the read flow, this method splits the receipt of
 */
 func timedRead(conn net.Conn, rl uint64, nc chan bool, sc chan bool) {
 	start := time.Now().UnixNano()
+	fmt.Printf("Read start: %v\n", start)
 	lt := start
 	// Chunk size is how much we read at each time interval
 	chunk := rl / 4
@@ -211,13 +217,75 @@ func timedRead(conn net.Conn, rl uint64, nc chan bool, sc chan bool) {
 	cbps := float64(rl) / float64(e)
 	// Convert from nano to reg seconds
 	cbps = cbps * 1000000000
-	fmt.Printf("RCV: %v Bps\n", ByteToString(uint64(cbps)))
+	fmt.Printf("RX: %v Bps\n", ByteToString(uint64(cbps)))
 	sc <- true
 	return
 }
 
+/*
+TimedRead implements a timed read of rl bytes from conn net.Conn
+It uses a chan (NC: NotifyChannel) to listen for requests for stats.
+It also uses a chan to signal the running function that it's done
+To allow this to be a a part of the read flow, this method splits the receipt of data into discrete chunks.
+*/
+func timedSend(conn net.Conn, sl uint64, nc chan bool, sc chan bool) {
+	start := time.Now().UnixNano()
+	lt := start
+	// Chunk size is how much we send per time interval
+	chunk := sl / 4
+
+	currentChunk := 1
+	// Read each chunk until we've read the entire thing
+	for currentChunk <= 4 {
+		chunkData := make([]byte, chunk)
+		rand.Read(chunkData)
+		rc := make(chan bool)
+		go basicWrite(conn, chunkData, rc)
+		select {
+		case _ = <-rc:
+			// Read the current time
+			t := time.Now().UnixNano()
+			// Get the elapsed from the last chunk time
+			e := uint64(t - lt)
+			var cbps float64
+			if e > 0 {
+				// Bytes transferred per nanosecond
+				cbps = float64(chunk) / float64(e)
+				// Convert from nano to reg seconds
+				cbps = cbps * 1000000000
+				//fmt.Printf("time: %v, BPS: %v, chunk: %v\n", e, int(cbps), int(chunk))
+			}
+			//fmt.Printf("Read chunk at %v BPS\n", ByteToString(uint64(cbps)))
+			// Set the last time to the time of this chunk's finished read
+			lt = t
+		case _ = <-nc:
+			fmt.Printf("Notify requested...\n")
+		}
+
+		// Append each read chunk to the full data array
+		// Don't do this, obviously it fills ya data up fam
+		//data = append(data, chunkData...)
+		currentChunk = currentChunk + 1
+	}
+	t := time.Now().UnixNano()
+	e := uint64(t - start)
+	cbps := float64(sl) / float64(e)
+	// Convert from nano to reg seconds
+	cbps = cbps * 1000000000
+	// TX and RX will be slightly different as the timing here does not include the time the last chunk is read.
+	fmt.Printf("TX: %v Bps\n", ByteToString(uint64(cbps)))
+	//sc <- true
+	return
+}
+
+// Both methods below use a channel to indicate their status
 func basicRead(conn net.Conn, data []byte, c chan bool) {
 	conn.Read(data)
+	c <- true
+	return
+}
+func basicWrite(conn net.Conn, data []byte, c chan bool) {
+	conn.Write(data)
 	c <- true
 	return
 }
