@@ -11,7 +11,6 @@ import (
 	"io/ioutil"
 	"net"
 	"os"
-	"strings"
 	"time"
 )
 
@@ -78,28 +77,33 @@ func (s *Server) Run() {
 			// Initilize a test for storing the results
 			test := stats.InitTest()
 			go timedRead(conn, o.DataLength, test.InMsgs, s.stopChan)
-			s.GetUserInput()
-			conn.Close()
+			// Schedule the test interval function
+			s.GetUserInput(test.InReqs)
 			// End the test and print the summary
 			test.End()
+			conn.Close()
 			test.Summary()
 		}
 	}
 }
 
-func (s *Server) GetUserInput() {
+/*
+GetUserInput: Retrieves user input from stdin and sends to the provided channel based on said input.
+*/
+func (s *Server) GetUserInput(c chan string) {
 	// Temp channel
 	tc := make(chan string)
+	reader := bufio.NewScanner(os.Stdin)
 	for {
-
 		// Non-blocking call to wait for user input
 		go func() {
-			reader := bufio.NewReader(os.Stdin)
-			s, _ := reader.ReadString('\n')
+			reader.Scan()
+			s := reader.Text()
 
-			s = strings.TrimSuffix(s, "\n")
-			s = strings.TrimSuffix(s, "\r")
+			//s = strings.TrimSuffix(s, "\n")
+			//s = strings.TrimSuffix(s, "\r")
 			tc <- s
+			return
 		}()
 
 		// This part here WILL block.
@@ -110,15 +114,13 @@ func (s *Server) GetUserInput() {
 			switch str {
 			case "stats":
 				fmt.Printf("Stats requested.\n")
-				s.notifyChan <- true
+				c <- str
 			}
 		// If we get signalled to stop
 		case <-s.stopChan:
-			fmt.Printf("finished input scanning\n")
 			return
 		}
 	}
-
 }
 
 /*
@@ -189,7 +191,7 @@ It uses a chan (NC: NotifyChannel) to send stats.
 It also uses a chan to signal the running function that it's done
 To allow this to be a a part of the read flow, this method splits the receipt of data into discrete chunks.
 */
-func timedRead(conn net.Conn, rl uint64, nc chan stats.TestResult, sc chan bool) {
+func timedRead(conn net.Conn, rl uint64, nc chan stats.BwTestResult, sc chan bool) {
 	start := time.Now().UnixNano()
 	fmt.Printf("Read start: %v\n", start)
 	lt := start
@@ -214,7 +216,7 @@ func timedRead(conn net.Conn, rl uint64, nc chan stats.TestResult, sc chan bool)
 
 			if e > 0 {
 				// Bytes transferred per nanosecond
-				tr := stats.TestResult{
+				tr := stats.BwTestResult{
 					Bytes:   chunk,
 					Elapsed: e,
 				}
