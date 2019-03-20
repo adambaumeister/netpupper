@@ -6,6 +6,10 @@ import (
 	"time"
 )
 
+type Collector interface {
+	WriteBwTest(BpsResult)
+}
+
 type Test struct {
 	StartTime int64
 	Queue     []BwTestResult
@@ -14,6 +18,12 @@ type Test struct {
 
 	Stop    chan bool
 	EndTime int64
+
+	Collector Collector
+}
+
+type IntTestResult interface {
+	Get() uint64
 }
 
 type BwTestResult struct {
@@ -21,8 +31,18 @@ type BwTestResult struct {
 	Elapsed uint64
 }
 
+type BpsResult struct {
+	Bps float64
+}
+
+func (b *BpsResult) Get() uint64 {
+	return uint64(b.Bps)
+}
+
 func InitTest() *Test {
 	t := Test{}
+	t.Collector = &StdoutCollector{}
+
 	t.Queue = []BwTestResult{}
 	t.InMsgs = make(chan BwTestResult)
 	t.InReqs = make(chan string)
@@ -68,7 +88,10 @@ func (t *Test) Current() {
 	cbps := float64(tb) / float64(et)
 	// Convert from nano to reg seconds
 	cbps = cbps * 1000000000
-	fmt.Printf("CURRENT (len: %v): %v\n", len(t.Queue), perf.ByteToString(uint64(cbps)))
+	tr := BpsResult{
+		Bps: cbps,
+	}
+	t.Collector.WriteBwTest(tr)
 
 }
 
