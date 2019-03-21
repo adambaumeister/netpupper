@@ -87,7 +87,7 @@ func (s *Server) ClientToServer(conn net.Conn, o *Open) {
 	test := stats.InitTest()
 	go timedRead(conn, o.DataLength, test.InMsgs, s.stopChan)
 	// Schedule the test interval function
-	s.GetUserInput(test.InReqs)
+	GetUserInput(test.InReqs, s.stopChan)
 	// End the test and print the summary
 	test.End()
 	conn.Close()
@@ -100,7 +100,7 @@ func (s *Server) ServerToClient(conn net.Conn, o *Open) {
 	test := stats.InitTest()
 	go timedSend(conn, o.DataLength, test.InMsgs, s.stopChan)
 	// Schedule the test interval function
-	s.GetUserInput(test.InReqs)
+	GetUserInput(test.InReqs, s.stopChan)
 	// End the test and print the summary
 	test.End()
 	conn.Close()
@@ -110,7 +110,8 @@ func (s *Server) ServerToClient(conn net.Conn, o *Open) {
 /*
 GetUserInput: Retrieves user input from stdin and sends to the provided channel based on said input.
 */
-func (s *Server) GetUserInput(c chan string) {
+func GetUserInput(c chan string, sc chan bool) {
+	fmt.Printf("Started input scanner\n")
 	// Temp channel
 	tc := make(chan string)
 	reader := bufio.NewScanner(os.Stdin)
@@ -137,7 +138,7 @@ func (s *Server) GetUserInput(c chan string) {
 				c <- str
 			}
 		// If we get signalled to stop
-		case <-s.stopChan:
+		case <-sc:
 			return
 		}
 	}
@@ -205,8 +206,9 @@ func (c *Client) Run() {
 			fmt.Printf("OPEN Request for reverse mode confirmed. Receiving data %v...\n", dl)
 			// Initilize a test for storing the results
 			test := stats.InitTest()
-			timedRead(conn, dl, test.InMsgs, c.stopChan)
-
+			go timedRead(conn, dl, test.InMsgs, c.stopChan)
+			GetUserInput(test.InReqs, c.stopChan)
+			// Schedule the test interval function
 			test.End()
 			test.Summary()
 			return
@@ -214,7 +216,8 @@ func (c *Client) Run() {
 			fmt.Printf("OPEN Request confirmed. Sending data...\n")
 			// Initilize a test for storing the results
 			test := stats.InitTest()
-			timedSend(conn, dl, test.InMsgs, c.stopChan)
+			go timedSend(conn, dl, test.InMsgs, c.stopChan)
+			GetUserInput(test.InReqs, c.stopChan)
 			test.End()
 			test.Summary()
 			return
@@ -273,7 +276,7 @@ func timedRead(conn net.Conn, rl uint64, nc chan stats.BwTestResult, sc chan boo
 
 	}
 	// THIS IS BROKEN IN REVERSE FOR SOME REASON
-	//sc <- true
+	sc <- true
 	fmt.Printf("read end\n\n")
 	return
 }
