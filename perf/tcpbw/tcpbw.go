@@ -70,21 +70,39 @@ func (s *Server) Run() {
 		case h.PacketType.Value == OPEN_TYPE:
 			var o = Open{}
 			o = ReadOpen(conn)
-			fmt.Printf("Got a connection from: %v, Packet Type: %v Data to follow: %v bytes\n", conn.RemoteAddr(),
-				h.PacketType.Value, o.DataLength)
-			SendConfirm(conn)
-
-			// Initilize a test for storing the results
-			test := stats.InitTest()
-			go timedRead(conn, o.DataLength, test.InMsgs, s.stopChan)
-			// Schedule the test interval function
-			s.GetUserInput(test.InReqs)
-			// End the test and print the summary
-			test.End()
-			conn.Close()
-			test.Summary()
+			if o.Reverse == 0 {
+				s.ClientToServer(conn, &o)
+			}
 		}
 	}
+}
+func (s *Server) ClientToServer(conn net.Conn, o *Open) {
+
+	fmt.Printf("Got a connection from: %v, Data to follow: %v bytes\n", conn.RemoteAddr(), o.DataLength)
+	SendConfirm(conn)
+
+	// Initilize a test for storing the results
+	test := stats.InitTest()
+	go timedRead(conn, o.DataLength, test.InMsgs, s.stopChan)
+	// Schedule the test interval function
+	s.GetUserInput(test.InReqs)
+	// End the test and print the summary
+	test.End()
+	conn.Close()
+	test.Summary()
+}
+func (s *Server) ServerToClient(conn net.Conn, o *Open) {
+	fmt.Printf("Got a connection from: %v, Data to follow: %v bytes REVERSE\n", conn.RemoteAddr(), o.DataLength)
+	SendConfirm(conn)
+	// Initilize a test for storing the results
+	test := stats.InitTest()
+	go timedSend(conn, o.DataLength, test.InMsgs, s.stopChan)
+	// Schedule the test interval function
+	s.GetUserInput(test.InReqs)
+	// End the test and print the summary
+	test.End()
+	conn.Close()
+	test.Summary()
 }
 
 /*
@@ -170,7 +188,7 @@ func (c *Client) Run() {
 	fmt.Printf("Succesfully connected to: %v\n", conn.RemoteAddr())
 
 	// Send the open message, request to start
-	SendOpen(conn, dl)
+	SendOpen(conn, dl, 0)
 	// Wait for a confirmation
 	h := ReadHeader(conn)
 	switch {
@@ -179,8 +197,9 @@ func (c *Client) Run() {
 		// Test by splitting up the data
 		b := make([]byte, dl)
 		rand.Read(b)
-
-		timedSend(conn, dl, c.notifyChan, c.stopChan)
+		// Initilize a test for storing the results
+		test := stats.InitTest()
+		timedSend(conn, dl, test.InMsgs, c.stopChan)
 		return
 	}
 }
@@ -239,12 +258,12 @@ func timedRead(conn net.Conn, rl uint64, nc chan stats.BwTestResult, sc chan boo
 }
 
 /*
-TimedRead implements a timed read of rl bytes from conn net.Conn
+TimedSend implements a timed send method from Conn of sl bytes.
 It uses a chan (NC: NotifyChannel) to listen for requests for stats.
 It also uses a chan to signal the running function that it's done
 To allow this to be a a part of the read flow, this method splits the receipt of data into discrete chunks.
 */
-func timedSend(conn net.Conn, sl uint64, nc chan bool, sc chan bool) {
+func timedSend(conn net.Conn, sl uint64, nc chan stats.BwTestResult, sc chan bool) {
 	start := time.Now().UnixNano()
 	lt := start
 	// Chunk size is how much we read at each time interval
@@ -261,8 +280,6 @@ func timedSend(conn net.Conn, sl uint64, nc chan bool, sc chan bool) {
 		rc := make(chan bool)
 		go basicWrite(conn, chunkData, rc)
 		select {
-		case _ = <-nc:
-			fmt.Printf("Stats: time: %v, BPS: %v, chunk: %v\n", e, int(cbps), int(chunk))
 		case _ = <-rc:
 			// Read the current time
 			t := time.Now().UnixNano()
@@ -274,6 +291,13 @@ func timedSend(conn net.Conn, sl uint64, nc chan bool, sc chan bool) {
 				// Convert from nano to reg seconds
 				cbps = cbps * 1000000000
 				//fmt.Printf("time: %v, BPS: %v, chunk: %v\n", e, int(cbps), int(chunk))
+				// Bytes transferred per nanosecond
+				tr := stats.BwTestResult{
+					Bytes:   chunk,
+					Elapsed: e,
+				}
+				// Send the result to the given notify channel as type stats.TestResuly
+				nc <- tr
 			}
 			//fmt.Printf("Read chunk at %v BPS\n", ByteToString(uint64(cbps)))
 			// Set the last time to the time of this chunk's finished read
