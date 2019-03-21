@@ -2,6 +2,7 @@ package tcpbw
 
 import (
 	"encoding/binary"
+	"fmt"
 	"github.com/adamb/netpupper/errors"
 	"net"
 )
@@ -44,9 +45,10 @@ type Open struct {
 }
 
 func (m *Open) Serialize() []byte {
-	b := make([]byte, 8)
-	binary.BigEndian.PutUint64(b, m.DataLength)
-	binary.BigEndian.PutUint16(b, m.Reverse)
+	b := make([]byte, OPEN_LENGTH)
+	binary.BigEndian.PutUint64(b[:8], m.DataLength)
+	binary.BigEndian.PutUint16(b[8:10], m.Reverse)
+	fmt.Printf("Bytes send: %v", b[8:10])
 	return b
 }
 func (m *Open) Write(i uint64, r uint16) {
@@ -95,6 +97,7 @@ func ReadOpen(c net.Conn) Open {
 	var b = make([]byte, OPEN_LENGTH)
 	_, err := c.Read(b)
 	errors.CheckError(err)
+
 	o := Open{}
 	o.DataLength = binary.BigEndian.Uint64(b[:8])
 	o.Reverse = binary.BigEndian.Uint16(b[8:10])
@@ -141,6 +144,7 @@ func SendOpen(conn net.Conn, dl uint64, r uint16) {
 
 	p.Header = &h
 	msg := Open{}
+
 	msg.Write(dl, r)
 
 	p.Message = &msg

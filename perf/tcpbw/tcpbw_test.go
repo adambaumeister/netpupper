@@ -1,7 +1,6 @@
 package tcpbw
 
 import (
-	"fmt"
 	"testing"
 )
 
@@ -19,12 +18,4 @@ func TestTcpbw(t *testing.T) {
 
 	c.Run()
 
-}
-
-func TestStringToByte(t *testing.T) {
-	s := "20G"
-	r := StringToByte(s)
-	fmt.Printf("StringToByte: %v:%v\n\n", s, r)
-	back := ByteToString(r)
-	fmt.Printf("ByteToString: %v:%v\n\n", r, back)
 }

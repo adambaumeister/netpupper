@@ -108,6 +108,7 @@ func (t *Test) Summary() {
 }
 
 func (t *Test) End() {
+	fmt.Printf("Client end\n")
 	t.EndTime = time.Now().UnixNano()
 	t.Stop <- true
 }

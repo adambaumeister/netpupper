@@ -17,6 +17,7 @@ Parse the cmdline args to determine what mode to run in
 func ParseArgs() tcpbw.Runner {
 	serverMode := flag.Bool("server", false, "Run as netpupper server.")
 	clientMode := flag.Bool("client", false, "Run as netpupper client.")
+	reverse := flag.Bool("reverse", false, "Receive, as opposed to send, data to server.")
 
 	s := &tcpbw.Server{}
 	s.Configure()
@@ -30,6 +31,7 @@ func ParseArgs() tcpbw.Runner {
 	s.Config.Address = *addr
 	c.Config.Server = *addr
 	c.Config.Bytes = *bytes
+	c.Config.Reverse = *reverse
 
 	if *clientMode {
 		fmt.Printf("Started in CLIENT mode")

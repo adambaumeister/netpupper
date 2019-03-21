@@ -72,6 +72,8 @@ func (s *Server) Run() {
 			o = ReadOpen(conn)
 			if o.Reverse == 0 {
 				s.ClientToServer(conn, &o)
+			} else {
+				s.ServerToClient(conn, &o)
 			}
 		}
 	}
@@ -151,8 +153,9 @@ type Client struct {
 }
 
 type clientConfig struct {
-	Server string
-	Bytes  string
+	Server  string
+	Bytes   string
+	Reverse bool
 }
 
 /*
@@ -188,19 +191,35 @@ func (c *Client) Run() {
 	fmt.Printf("Succesfully connected to: %v\n", conn.RemoteAddr())
 
 	// Send the open message, request to start
-	SendOpen(conn, dl, 0)
+	if c.Config.Reverse {
+		SendOpen(conn, dl, 1)
+	} else {
+		SendOpen(conn, dl, 0)
+	}
+
 	// Wait for a confirmation
 	h := ReadHeader(conn)
 	switch {
 	case h.PacketType.Value == CONFIRM_TYPE:
-		fmt.Printf("OPEN Request confirmed. Sending data...\n")
-		// Test by splitting up the data
-		b := make([]byte, dl)
-		rand.Read(b)
-		// Initilize a test for storing the results
-		test := stats.InitTest()
-		timedSend(conn, dl, test.InMsgs, c.stopChan)
-		return
+		if c.Config.Reverse {
+			fmt.Printf("OPEN Request for reverse mode confirmed. Receiving data %v...\n", dl)
+			// Initilize a test for storing the results
+			test := stats.InitTest()
+			timedRead(conn, dl, test.InMsgs, c.stopChan)
+
+			test.End()
+			test.Summary()
+			return
+		} else {
+			fmt.Printf("OPEN Request confirmed. Sending data...\n")
+			// Initilize a test for storing the results
+			test := stats.InitTest()
+			timedSend(conn, dl, test.InMsgs, c.stopChan)
+			test.End()
+			test.Summary()
+			return
+		}
+
 	}
 }
 
@@ -250,10 +269,12 @@ func timedRead(conn net.Conn, rl uint64, nc chan stats.BwTestResult, sc chan boo
 		// Append each read chunk to the full data array
 		// Don't do this, obviously it fills ya memory up fam
 		//data = append(data, chunkData...)
-
 		currentChunk = currentChunk + uint64(chunk)
+
 	}
-	sc <- true
+	// THIS IS BROKEN IN REVERSE FOR SOME REASON
+	//sc <- true
+	fmt.Printf("read end\n\n")
 	return
 }
 
@@ -315,8 +336,9 @@ func timedSend(conn net.Conn, sl uint64, nc chan stats.BwTestResult, sc chan boo
 	// Convert from nano to reg seconds
 	cbps = cbps * 1000000000
 	// TX and RX will be slightly different as the timing here does not include the time the last chunk is read.
+
+	sc <- true
 	fmt.Printf("TX: %v Bps\n", perf.ByteToString(uint64(cbps)))
-	//sc <- true
 	return
 }
 
