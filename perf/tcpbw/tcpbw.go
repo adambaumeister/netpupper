@@ -85,9 +85,9 @@ func (s *Server) ClientToServer(conn net.Conn, o *Open) {
 
 	// Initilize a test for storing the results
 	test := stats.InitTest()
-	go timedRead(conn, o.DataLength, test.InMsgs, s.stopChan)
+	timedRead(conn, o.DataLength, test.InMsgs, s.stopChan)
 	// Schedule the test interval function
-	GetUserInput(test.InReqs, s.stopChan)
+	//GetUserInput(test.InReqs, s.stopChan)
 	// End the test and print the summary
 	test.End()
 	conn.Close()
@@ -98,9 +98,9 @@ func (s *Server) ServerToClient(conn net.Conn, o *Open) {
 	SendConfirm(conn)
 	// Initilize a test for storing the results
 	test := stats.InitTest()
-	go timedSend(conn, o.DataLength, test.InMsgs, s.stopChan)
+	timedSend(conn, o.DataLength, test.InMsgs, s.stopChan)
 	// Schedule the test interval function
-	GetUserInput(test.InReqs, s.stopChan)
+	//GetUserInput(test.InReqs, s.stopChan)
 	// End the test and print the summary
 	test.End()
 	conn.Close()
@@ -206,18 +206,18 @@ func (c *Client) Run() {
 			fmt.Printf("OPEN Request for reverse mode confirmed. Receiving data %v...\n", dl)
 			// Initilize a test for storing the results
 			test := stats.InitTest()
-			go timedRead(conn, dl, test.InMsgs, c.stopChan)
-			GetUserInput(test.InReqs, c.stopChan)
+			timedRead(conn, dl, test.InMsgs, c.stopChan)
+			//GetUserInput(test.InReqs, c.stopChan)
 			// Schedule the test interval function
 			test.End()
 			test.Summary()
 			return
 		} else {
-			fmt.Printf("OPEN Request confirmed. Sending data...\n")
+			fmt.Printf("OPEN Request confirmed. Sending data.\n")
 			// Initilize a test for storing the results
 			test := stats.InitTest()
-			go timedSend(conn, dl, test.InMsgs, c.stopChan)
-			GetUserInput(test.InReqs, c.stopChan)
+			timedSend(conn, dl, test.InMsgs, c.stopChan)
+			//GetUserInput(test.InReqs, c.stopChan)
 			test.End()
 			test.Summary()
 			return
@@ -238,46 +238,38 @@ func timedRead(conn net.Conn, rl uint64, nc chan stats.BwTestResult, sc chan boo
 	lt := start
 	// Chunk size is how much we read at each time interval
 	chunk := perf.MEGABYTE
-
 	currentChunk := uint64(0)
 	// Read each chunk until we've read the entire thing
 	for currentChunk < rl {
 		chunkData := make([]byte, chunk)
-
-		rc := make(chan bool)
-		go basicRead(conn, chunkData, rc)
-
+		conn.Read(chunkData)
+		fmt.Printf("Got data: %v\n", chunkData[0])
 		var e uint64
-		select {
-		case _ = <-rc:
-			// Read the current time
-			t := time.Now().UnixNano()
-			// Get the elapsed from the last chunk time
-			e = uint64(t - lt)
 
-			if e > 0 {
-				// Bytes transferred per nanosecond
-				tr := stats.BwTestResult{
-					Bytes:   chunk,
-					Elapsed: e,
-				}
-				// Send the result to the given notify channel as type stats.TestResuly
-				nc <- tr
+		// Read the current time
+		t := time.Now().UnixNano()
+		// Get the elapsed from the last chunk time
+		e = uint64(t - lt)
+
+		if e > 0 {
+			// Bytes transferred per nanosecond
+			tr := stats.BwTestResult{
+				Bytes:   chunk,
+				Elapsed: e,
 			}
-			//fmt.Printf("Read chunk at %v BPS\n", ByteToString(uint64(cbps)))
-			// Set the last time to the time of this chunk's finished read
-			lt = t
+			// Send the result to the given notify channel as type stats.TestResuly
+			nc <- tr
 		}
 
-		// Append each read chunk to the full data array
-		// Don't do this, obviously it fills ya memory up fam
-		//data = append(data, chunkData...)
+		// Set the last time to the time of this chunk's finished read
+		lt = t
+
 		currentChunk = currentChunk + uint64(chunk)
+		//fmt.Printf("data: %v\n", chunkData)
 
 	}
 	// THIS IS BROKEN IN REVERSE FOR SOME REASON
-	sc <- true
-	fmt.Printf("read end\n\n")
+	//sc <- true
 	return
 }
 
@@ -292,7 +284,6 @@ func timedSend(conn net.Conn, sl uint64, nc chan stats.BwTestResult, sc chan boo
 	lt := start
 	// Chunk size is how much we read at each time interval
 	chunk := perf.MEGABYTE
-
 	currentChunk := uint64(0)
 	// Read each chunk until we've read the entire thing
 	var e uint64
@@ -301,32 +292,31 @@ func timedSend(conn net.Conn, sl uint64, nc chan stats.BwTestResult, sc chan boo
 	for currentChunk < sl {
 		chunkData := make([]byte, chunk)
 		rand.Read(chunkData)
-		rc := make(chan bool)
-		go basicWrite(conn, chunkData, rc)
-		select {
-		case _ = <-rc:
-			// Read the current time
-			t := time.Now().UnixNano()
-			// Get the elapsed from the last chunk time
-			e = uint64(t - lt)
-			if e > 0 {
-				// Bytes transferred per nanosecond
-				cbps = float64(chunk) / float64(e)
-				// Convert from nano to reg seconds
-				cbps = cbps * 1000000000
-				//fmt.Printf("time: %v, BPS: %v, chunk: %v\n", e, int(cbps), int(chunk))
-				// Bytes transferred per nanosecond
-				tr := stats.BwTestResult{
-					Bytes:   chunk,
-					Elapsed: e,
-				}
-				// Send the result to the given notify channel as type stats.TestResuly
-				nc <- tr
+		conn.Write(chunkData)
+		fmt.Printf("wrote data: %v\n", chunkData[0])
+
+		// Read the current time
+		t := time.Now().UnixNano()
+		// Get the elapsed from the last chunk time
+		e = uint64(t - lt)
+		if e > 0 {
+			// Bytes transferred per nanosecond
+			cbps = float64(chunk) / float64(e)
+			// Convert from nano to reg seconds
+			cbps = cbps * 1000000000
+			//fmt.Printf("time: %v, BPS: %v, chunk: %v\n", e, int(cbps), int(chunk))
+			// Bytes transferred per nanosecond
+			tr := stats.BwTestResult{
+				Bytes:   chunk,
+				Elapsed: e,
 			}
-			//fmt.Printf("Read chunk at %v BPS\n", ByteToString(uint64(cbps)))
-			// Set the last time to the time of this chunk's finished read
-			lt = t
+			// Send the result to the given notify channel as type stats.TestResuly
+			nc <- tr
 		}
+		//fmt.Printf("Read chunk at %v BPS\n", ByteToString(uint64(cbps)))
+		// Set the last time to the time of this chunk's finished read
+
+		lt = t
 
 		// Append each read chunk to the full data array
 		// Don't do this, obviously it fills ya data up fam
@@ -339,20 +329,18 @@ func timedSend(conn net.Conn, sl uint64, nc chan stats.BwTestResult, sc chan boo
 	// Convert from nano to reg seconds
 	cbps = cbps * 1000000000
 	// TX and RX will be slightly different as the timing here does not include the time the last chunk is read.
-
-	sc <- true
+	fmt.Printf("Send finished\n")
+	//sc <- true
 	fmt.Printf("TX: %v Bps\n", perf.ByteToString(uint64(cbps)))
 	return
 }
 
 // Both methods below use a channel to indicate their status
-func basicRead(conn net.Conn, data []byte, c chan bool) {
+func basicRead(conn net.Conn, data []byte) {
 	conn.Read(data)
-	c <- true
 	return
 }
-func basicWrite(conn net.Conn, data []byte, c chan bool) {
+func basicWrite(conn net.Conn, data []byte) {
 	conn.Write(data)
-	c <- true
 	return
 }
