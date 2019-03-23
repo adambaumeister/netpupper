@@ -9,6 +9,7 @@ import (
 
 const OPEN_TYPE = 1
 const CONFIRM_TYPE = 2
+const CLOSE_TYPE = 3
 
 const PACKETTYPE_LENGTH = 2
 const PACKETLEN_LENGTH = 2
@@ -161,6 +162,21 @@ func SendConfirm(conn net.Conn) {
 	p.AddField(&pl)
 	pt := IntField{}
 	pt.Write(CONFIRM_TYPE)
+	p.AddField(&pt)
+
+	b := p.Serialize()
+	_, err := conn.Write(b)
+	errors.CheckError(err)
+}
+
+func SendClose(conn net.Conn) {
+	p := Header{}
+	pl := IntField{}
+	pl.Write(4)
+
+	p.AddField(&pl)
+	pt := IntField{}
+	pt.Write(CLOSE_TYPE)
 	p.AddField(&pt)
 
 	b := p.Serialize()

@@ -226,6 +226,20 @@ func (c *Client) Run() {
 	}
 }
 
+func simpleRead(conn net.Conn, rl uint64, nc chan stats.BwTestResult, sc chan bool) {
+	fmt.Printf("Simple Read start\n")
+	data := make([]byte, rl)
+	conn.Read(data)
+	fmt.Printf("Read: %v\n", data[len(data)-10:])
+}
+func simpleSend(conn net.Conn, rl uint64, nc chan stats.BwTestResult, sc chan bool) {
+	fmt.Printf("Simple Write start\n")
+	data := make([]byte, rl)
+	rand.Read(data)
+	fmt.Printf("Writing: %v\n", data[len(data)-10:])
+	conn.Write(data)
+}
+
 /*
 TimedRead implements a timed read of rl bytes from conn net.Conn
 It uses a chan (NC: NotifyChannel) to send stats.
@@ -234,16 +248,17 @@ To allow this to be a a part of the read flow, this method splits the receipt of
 */
 func timedRead(conn net.Conn, rl uint64, nc chan stats.BwTestResult, sc chan bool) {
 	start := time.Now().UnixNano()
-	fmt.Printf("Read start: %v\n", start)
+	fmt.Printf("Receiving: %v\n", rl)
 	lt := start
 	// Chunk size is how much we read at each time interval
-	chunk := perf.MEGABYTE
+	chunk := 1000
 	currentChunk := uint64(0)
+	chunkData := make([]byte, chunk)
 	// Read each chunk until we've read the entire thing
-	for currentChunk < rl {
-		chunkData := make([]byte, chunk)
-		conn.Read(chunkData)
-		fmt.Printf("Got data: %v\n", chunkData[0])
+	for currentChunk <= rl {
+
+		_, err := conn.Read(chunkData)
+		errors.CheckError(err)
 		var e uint64
 
 		// Read the current time
@@ -265,11 +280,11 @@ func timedRead(conn net.Conn, rl uint64, nc chan stats.BwTestResult, sc chan boo
 		lt = t
 
 		currentChunk = currentChunk + uint64(chunk)
-		//fmt.Printf("data: %v\n", chunkData)
+		//fmt.Printf("Chunk: %v data: %v\n", currentChunk, chunkData[0:2])
 
 	}
-	// THIS IS BROKEN IN REVERSE FOR SOME REASON
-	//sc <- true
+	// Signal that the read is finished on the read end.
+	SendClose(conn)
 	return
 }
 
@@ -283,18 +298,18 @@ func timedSend(conn net.Conn, sl uint64, nc chan stats.BwTestResult, sc chan boo
 	start := time.Now().UnixNano()
 	lt := start
 	// Chunk size is how much we read at each time interval
-	chunk := perf.MEGABYTE
+	chunk := 1000
 	currentChunk := uint64(0)
 	// Read each chunk until we've read the entire thing
 	var e uint64
 	var cbps float64
+	fmt.Printf("Sending: %v\n", sl)
+	chunkData := make([]byte, chunk)
+	for currentChunk <= sl {
 
-	for currentChunk < sl {
-		chunkData := make([]byte, chunk)
 		rand.Read(chunkData)
-		conn.Write(chunkData)
-		fmt.Printf("wrote data: %v\n", chunkData[0])
-
+		_, err := conn.Write(chunkData)
+		errors.CheckError(err)
 		// Read the current time
 		t := time.Now().UnixNano()
 		// Get the elapsed from the last chunk time
@@ -322,6 +337,7 @@ func timedSend(conn net.Conn, sl uint64, nc chan stats.BwTestResult, sc chan boo
 		// Don't do this, obviously it fills ya data up fam
 		//data = append(data, chunkData...)
 		currentChunk = currentChunk + uint64(chunk)
+		//fmt.Printf("Chunk: %v data: %v\n", currentChunk,chunkData[0:2])
 	}
 	t := time.Now().UnixNano()
 	e = uint64(t - start)
@@ -330,17 +346,11 @@ func timedSend(conn net.Conn, sl uint64, nc chan stats.BwTestResult, sc chan boo
 	cbps = cbps * 1000000000
 	// TX and RX will be slightly different as the timing here does not include the time the last chunk is read.
 	fmt.Printf("Send finished\n")
-	//sc <- true
-	fmt.Printf("TX: %v Bps\n", perf.ByteToString(uint64(cbps)))
-	return
-}
-
-// Both methods below use a channel to indicate their status
-func basicRead(conn net.Conn, data []byte) {
-	conn.Read(data)
-	return
-}
-func basicWrite(conn net.Conn, data []byte) {
-	conn.Write(data)
+	h := ReadHeader(conn)
+	if h.PacketType.Value == CLOSE_TYPE {
+		fmt.Printf("Close (%v) TX: %v Bps\n", h.PacketType.Value, perf.ByteToString(uint64(cbps)))
+	} else {
+		fmt.Printf("Failed to read close message: %v\n", h.PacketType.Value)
+	}
 	return
 }
