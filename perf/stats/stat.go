@@ -84,6 +84,7 @@ func (t *Test) Current() {
 		tb = tb + tr.Bytes
 		et = et + tr.Elapsed
 	}
+
 	// divide the total bytes by the total elapsed time
 	cbps := float64(tb) / float64(et)
 	// Convert from nano to reg seconds

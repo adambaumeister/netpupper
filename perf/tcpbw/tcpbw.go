@@ -255,7 +255,7 @@ func timedRead(conn net.Conn, rl uint64, nc chan stats.BwTestResult, sc chan boo
 	currentChunk := uint64(0)
 	chunkData := make([]byte, chunk)
 	// Read each chunk until we've read the entire thing
-	for currentChunk <= rl {
+	for currentChunk < rl {
 
 		_, err := conn.Read(chunkData)
 		errors.CheckError(err)
@@ -266,15 +266,13 @@ func timedRead(conn net.Conn, rl uint64, nc chan stats.BwTestResult, sc chan boo
 		// Get the elapsed from the last chunk time
 		e = uint64(t - lt)
 
-		if e > 0 {
-			// Bytes transferred per nanosecond
-			tr := stats.BwTestResult{
-				Bytes:   chunk,
-				Elapsed: e,
-			}
-			// Send the result to the given notify channel as type stats.TestResuly
-			nc <- tr
+		// Bytes transferred per nanosecond
+		tr := stats.BwTestResult{
+			Bytes:   chunk,
+			Elapsed: e,
 		}
+		// Send the result to the given notify channel as type stats.TestResuly
+		nc <- tr
 
 		// Set the last time to the time of this chunk's finished read
 		lt = t
@@ -305,7 +303,7 @@ func timedSend(conn net.Conn, sl uint64, nc chan stats.BwTestResult, sc chan boo
 	var cbps float64
 	fmt.Printf("Sending: %v\n", sl)
 	chunkData := make([]byte, chunk)
-	for currentChunk <= sl {
+	for currentChunk < sl {
 
 		rand.Read(chunkData)
 		_, err := conn.Write(chunkData)
@@ -314,20 +312,18 @@ func timedSend(conn net.Conn, sl uint64, nc chan stats.BwTestResult, sc chan boo
 		t := time.Now().UnixNano()
 		// Get the elapsed from the last chunk time
 		e = uint64(t - lt)
-		if e > 0 {
-			// Bytes transferred per nanosecond
-			cbps = float64(chunk) / float64(e)
-			// Convert from nano to reg seconds
-			cbps = cbps * 1000000000
-			//fmt.Printf("time: %v, BPS: %v, chunk: %v\n", e, int(cbps), int(chunk))
-			// Bytes transferred per nanosecond
-			tr := stats.BwTestResult{
-				Bytes:   chunk,
-				Elapsed: e,
-			}
-			// Send the result to the given notify channel as type stats.TestResuly
-			nc <- tr
+		// Bytes transferred per nanosecond
+		cbps = float64(chunk) / float64(e)
+		// Convert from nano to reg seconds
+		cbps = cbps * 1000000000
+		//fmt.Printf("time: %v, BPS: %v, chunk: %v\n", e, int(cbps), int(chunk))
+		// Bytes transferred per nanosecond
+		tr := stats.BwTestResult{
+			Bytes:   chunk,
+			Elapsed: e,
 		}
+		// Send the result to the given notify channel as type stats.TestResuly
+		nc <- tr
 		//fmt.Printf("Read chunk at %v BPS\n", ByteToString(uint64(cbps)))
 		// Set the last time to the time of this chunk's finished read
 

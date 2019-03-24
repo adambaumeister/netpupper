@@ -7,6 +7,7 @@ import (
 
 const GIGABYTE = 1000000000
 const MEGABYTE = 1000000
+const KILOBYTE = 1000
 
 /*
 Convert a string with a byte delimiter to a byte len
@@ -34,6 +35,8 @@ func ByteToString(b uint64) string {
 		return fmt.Sprintf("%vG", b/GIGABYTE)
 	case b > MEGABYTE:
 		return fmt.Sprintf("%vM", b/MEGABYTE)
+	case b > KILOBYTE:
+		return fmt.Sprintf("%vK", b/KILOBYTE)
 	default:
 		return string(b)
 	}
