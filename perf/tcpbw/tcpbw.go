@@ -90,7 +90,6 @@ func (s *Server) ClientToServer(conn net.Conn, o *Open) {
 	//GetUserInput(test.InReqs, s.stopChan)
 	// End the test and print the summary
 	test.End()
-	conn.Close()
 	test.Summary()
 }
 func (s *Server) ServerToClient(conn net.Conn, o *Open) {
@@ -103,7 +102,9 @@ func (s *Server) ServerToClient(conn net.Conn, o *Open) {
 	//GetUserInput(test.InReqs, s.stopChan)
 	// End the test and print the summary
 	test.End()
-	conn.Close()
+
+	//We don't intentionally close the server connection ya dope!!
+	//conn.Close()
 	test.Summary()
 }
 
