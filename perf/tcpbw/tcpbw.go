@@ -15,7 +15,7 @@ import (
 )
 
 type Runner interface {
-	Configure()
+	Configure(string)
 	Run()
 }
 
@@ -38,13 +38,18 @@ type ServerConfig struct {
 Configure the TCPBW Server
 Returns TRUE if this method matches the requested config
 */
-func (s *Server) Configure() {
-	serverFile := "./server.yml"
+func (s *Server) Configure(cf string) {
+	var serverFile string
+	if len(cf) > 0 {
+		serverFile = cf
+	} else if len(os.Getenv("NETP_CONFIG")) > 0 {
+		serverFile = os.Getenv("NETP_CONFIG")
+	}
 	// First, try bootstrapping from the YAML server file
 	s.Config = &ServerConfig{}
 	// If the yaml file exists
 	if _, err := os.Stat(serverFile); os.IsExist(err) {
-		data, err := ioutil.ReadFile("./server.yml")
+		data, err := ioutil.ReadFile(serverFile)
 		errors.CheckError(err)
 
 		err = yaml.Unmarshal(data, s.Config)
@@ -164,13 +169,18 @@ type clientConfig struct {
 Configure the TCPBW Client
 Configuration can set external to this function, however, should be done after this call.
 */
-func (c *Client) Configure() {
-	f := "./client.yml"
+func (c *Client) Configure(cf string) {
+	var f string
+	if len(cf) > 0 {
+		f = cf
+	} else if len(os.Getenv("NETP_CONFIG")) > 0 {
+		f = os.Getenv("NETP_CONFIG")
+	}
 	// First, try bootstrapping from the YAML server file
 	c.Config = &clientConfig{}
 	// If the yaml file exists
 	if _, err := os.Stat(f); os.IsExist(err) {
-		data, err := ioutil.ReadFile("./server.yml")
+		data, err := ioutil.ReadFile(f)
 		errors.CheckError(err)
 
 		err = yaml.Unmarshal(data, c.Config)
@@ -225,20 +235,6 @@ func (c *Client) Run() {
 		}
 
 	}
-}
-
-func simpleRead(conn net.Conn, rl uint64, nc chan stats.BwTestResult, sc chan bool) {
-	fmt.Printf("Simple Read start\n")
-	data := make([]byte, rl)
-	conn.Read(data)
-	fmt.Printf("Read: %v\n", data[len(data)-10:])
-}
-func simpleSend(conn net.Conn, rl uint64, nc chan stats.BwTestResult, sc chan bool) {
-	fmt.Printf("Simple Write start\n")
-	data := make([]byte, rl)
-	rand.Read(data)
-	fmt.Printf("Writing: %v\n", data[len(data)-10:])
-	conn.Write(data)
 }
 
 /*
@@ -342,10 +338,10 @@ func timedSend(conn net.Conn, sl uint64, nc chan stats.BwTestResult, sc chan boo
 	// Convert from nano to reg seconds
 	cbps = cbps * 1000000000
 	// TX and RX will be slightly different as the timing here does not include the time the last chunk is read.
-	fmt.Printf("Send finished\n")
 	h := ReadHeader(conn)
 	if h.PacketType.Value == CLOSE_TYPE {
 		fmt.Printf("Close (%v) TX: %v Bps\n", h.PacketType.Value, perf.ByteToString(uint64(cbps)))
+		conn.Close()
 	} else {
 		fmt.Printf("Failed to read close message: %v\n", h.PacketType.Value)
 	}
