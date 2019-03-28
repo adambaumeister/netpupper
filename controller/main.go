@@ -1,8 +1,8 @@
 package controller
 
 type Client struct {
-	TcpbwAddr string
-	Tags      []Tag
+	Addr string
+	Tags []Tag
 }
 
 type Tag struct {
@@ -12,4 +12,8 @@ type Tag struct {
 
 type Controller struct {
 	Clients []Client
+}
+
+func (c *Controller) AddClient(client Client) {
+	c.Clients = append(c.Clients, client)
 }
