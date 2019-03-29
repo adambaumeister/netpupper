@@ -3,8 +3,14 @@ package main
 import (
 	"flag"
 	"fmt"
+	"github.com/adamb/netpupper/api"
 	"github.com/adamb/netpupper/perf/tcpbw"
 )
+
+type Runner interface {
+	Configure(string)
+	Run()
+}
 
 func main() {
 	r := ParseArgs()
@@ -14,21 +20,25 @@ func main() {
 /*
 Parse the cmdline args to determine what mode to run in
 */
-func ParseArgs() tcpbw.Runner {
+func ParseArgs() Runner {
 	serverMode := flag.Bool("server", false, "Run as netpupper server.")
 	clientMode := flag.Bool("client", false, "Run as netpupper client.")
 	reverse := flag.Bool("reverse", false, "Reverse data direction.")
 	cfgFile := flag.String("config", "./server.yml", "YAML Configuration file")
+	daemon := flag.Bool("daemon", false, "Run in DAEMON mode and start the API.")
 
-	s := &tcpbw.Server{}
-	s.Configure(*cfgFile)
-	c := &tcpbw.Client{}
-	c.Configure(*cfgFile)
 	// CMDLINE Args
 	addr := flag.String("address", ":8080", "Address to bind server daemon OR server address to test against.")
 	bytes := flag.String("bytes", "1G", "Total bytes to send.")
 
 	flag.Parse()
+	s := &tcpbw.Server{}
+	s.Configure(*cfgFile)
+	c := &tcpbw.Client{}
+	c.Configure(*cfgFile)
+
+	a := &api.API{}
+	a.Configure(*cfgFile)
 	s.Config.Address = *addr
 	c.Config.Server = *addr
 	c.Config.Bytes = *bytes
@@ -40,6 +50,9 @@ func ParseArgs() tcpbw.Runner {
 	} else if *serverMode {
 		fmt.Printf("Started in SERVER mode")
 		return s
+	} else if *daemon {
+		fmt.Printf("Started in Daemon mode.")
+		return a
 	} else {
 		return s
 	}

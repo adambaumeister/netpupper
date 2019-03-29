@@ -7,6 +7,7 @@ import (
 	"github.com/adamb/netpupper/controller"
 	"github.com/adamb/netpupper/errors"
 	"github.com/adamb/netpupper/perf/tcpbw"
+	"gopkg.in/yaml.v2"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -16,6 +17,42 @@ import (
 
 type API struct {
 	Controller *controller.Controller
+
+	Config *APIConfig
+}
+type APIConfig struct {
+	Servers []string
+}
+
+/*
+Configure the API
+Returns TRUE if this method matches the requested config
+*/
+func (a *API) Configure(cf string) {
+	fmt.Printf("Got yaml configuration %v\n", cf)
+	var serverFile string
+	if len(cf) > 0 {
+		serverFile = cf
+	} else if len(os.Getenv("NETP_CONFIG")) > 0 {
+		serverFile = os.Getenv("NETP_CONFIG")
+	}
+	// First, try bootstrapping from the YAML server file
+	a.Config = &APIConfig{}
+	// If the yaml file exists
+	if _, err := os.Stat(serverFile); os.IsExist(err) {
+		data, err := ioutil.ReadFile(serverFile)
+		errors.CheckError(err)
+
+		err = yaml.Unmarshal(data, a.Config)
+		errors.CheckError(err)
+	}
+}
+func (a *API) Run() {
+	// Register to the provided list of servers, if any
+	for _, s := range a.Config.Servers {
+		a.SendRegister(s)
+	}
+	StartServerApi("8999")
 }
 
 func StartServerApi(p string) API {
@@ -80,7 +117,7 @@ func (a *API) StartbwTest(addr string, server string, byteCount string) {
 /*
 Send a register
 */
-func (a *API) SendRegister() {
+func (a *API) SendRegister(server string) {
 	host, _ := os.Hostname()
 	gt := controller.Tag{
 		Name:  "name",
@@ -92,7 +129,7 @@ func (a *API) SendRegister() {
 	}
 	b, err := json.Marshal(reg)
 	errors.CheckError(err)
-	resp, err := http.Post("http://127.0.0.1:8999/register", "application/json", bytes.NewBuffer(b))
+	resp, err := http.Post(fmt.Sprintf("http://%v/register", server), "application/json", bytes.NewBuffer(b))
 	errors.CheckError(err)
 
 	msg := Message{}

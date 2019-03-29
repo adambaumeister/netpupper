@@ -14,11 +14,6 @@ import (
 	"time"
 )
 
-type Runner interface {
-	Configure(string)
-	Run()
-}
-
 /*
 Main struct for tcp bandwidth server
 	notifyChan: bool channel, notifies the server to do "something", depending on the context
