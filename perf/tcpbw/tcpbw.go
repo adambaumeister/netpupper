@@ -156,10 +156,10 @@ TCPBW Client struct
 type Client struct {
 	notifyChan chan bool
 	stopChan   chan bool
-	Config     *clientConfig
+	Config     *ClientConfig
 }
 
-type clientConfig struct {
+type ClientConfig struct {
 	Server  string
 	Bytes   string
 	Reverse bool
@@ -177,7 +177,7 @@ func (c *Client) Configure(cf string) {
 		f = os.Getenv("NETP_CONFIG")
 	}
 	// First, try bootstrapping from the YAML server file
-	c.Config = &clientConfig{}
+	c.Config = &ClientConfig{}
 	// If the yaml file exists
 	if _, err := os.Stat(f); os.IsExist(err) {
 		data, err := ioutil.ReadFile(f)

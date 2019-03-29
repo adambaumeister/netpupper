@@ -5,7 +5,12 @@ import (
 )
 
 func TestStartServerApi(t *testing.T) {
-	go StartServerApi()
-	a := APIClient{}
+	go StartServerApi("8999")
+	a := API{}
 	a.SendRegister()
+	a.StartbwTest(
+		"127.0.0.1:8999",
+		"127.0.0.1:8080",
+		"500m",
+	)
 }

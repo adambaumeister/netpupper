@@ -17,3 +17,8 @@ type Controller struct {
 func (c *Controller) AddClient(client Client) {
 	c.Clients = append(c.Clients, client)
 }
+
+func (c *Controller) GetFirstClient() Client {
+	return c.Clients[0]
+
+}
