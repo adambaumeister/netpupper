@@ -44,11 +44,11 @@ func (s *Server) Configure(cf string) {
 	s.Config = &ServerConfig{}
 	// If the yaml file exists
 	if _, err := os.Stat(serverFile); err == nil {
-		fmt.Printf("yep got here\n")
 		data, err := ioutil.ReadFile(serverFile)
 		errors.CheckError(err)
 
 		err = yaml.Unmarshal(data, s)
+		fmt.Printf("yep got here: %v\n", s.Config.Address)
 		errors.CheckError(err)
 	}
 }

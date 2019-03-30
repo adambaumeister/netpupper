@@ -32,28 +32,27 @@ func ParseArgs() Runner {
 	bytes := flag.String("bytes", "1G", "Total bytes to send.")
 
 	flag.Parse()
-	s := &tcpbw.Server{}
-	s.Configure(*cfgFile)
-	c := &tcpbw.Client{}
-	c.Configure(*cfgFile)
-
-	a := &api.API{}
-	a.Configure(*cfgFile)
-	s.Config.Address = *addr
-	c.Config.Server = *addr
-	c.Config.Bytes = *bytes
-	c.Config.Reverse = *reverse
 
 	if *clientMode {
 		fmt.Printf("Started in CLIENT mode\n")
+		c := &tcpbw.Client{}
+		c.Configure(*cfgFile)
+		c.Config.Server = *addr
+		c.Config.Bytes = *bytes
+		c.Config.Reverse = *reverse
 		return c
 	} else if *serverMode {
+		s := &tcpbw.Server{}
+		s.Configure(*cfgFile)
+		s.Config.Address = *addr
 		fmt.Printf("Started in SERVER mode\n")
 		return s
 	} else if *daemon {
+		a := &api.API{}
+		a.Configure(*cfgFile)
 		fmt.Printf("Started in Daemon mode.\n")
 		return a
 	} else {
-		return s
+		return nil
 	}
 }

@@ -18,7 +18,8 @@ import (
 type API struct {
 	Controller *controller.Controller
 
-	Config *APIConfig
+	Config     *APIConfig
+	configFile string
 }
 type APIConfig struct {
 	Servers []string
@@ -31,6 +32,7 @@ Returns TRUE if this method matches the requested config
 */
 func (a *API) Configure(cf string) {
 
+	a.configFile = cf
 	var serverFile string
 	if len(cf) > 0 {
 		serverFile = cf
@@ -61,6 +63,12 @@ func (a *API) Run() {
 	for _, s := range a.Config.Servers {
 		a.SendRegister(s)
 	}
+	// Start the test listeners
+	// TCP BANDWIDTH SERVER
+	s := tcpbw.Server{}
+	s.Configure(a.configFile)
+	fmt.Printf("Start TCPBW port: %v\n", s.Config.Address)
+	go s.Run()
 	fmt.Printf("Started API server on %v\n", a.Config.ApiPort)
 	StartServerApi(a.Config.ApiPort)
 }

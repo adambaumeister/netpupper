@@ -23,6 +23,6 @@ func _TestTcpbw(t *testing.T) {
 
 func TestClient_Configure(t *testing.T) {
 	s := Server{}
-	s.Configure("C:/users/adam/go/src/github.com/adamb/netpupper/daemon.yml")
+	s.Configure("C:/users/adam/go/src/github.com/adamb/netpupper/daemon_server.yml")
 	fmt.Printf("%v\n", s.Config.Address)
 }
