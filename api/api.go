@@ -22,6 +22,7 @@ type API struct {
 }
 type APIConfig struct {
 	Servers []string
+	ApiPort string
 }
 
 /*
@@ -29,17 +30,21 @@ Configure the API
 Returns TRUE if this method matches the requested config
 */
 func (a *API) Configure(cf string) {
-	fmt.Printf("Got yaml configuration %v\n", cf)
+
 	var serverFile string
 	if len(cf) > 0 {
 		serverFile = cf
 	} else if len(os.Getenv("NETP_CONFIG")) > 0 {
 		serverFile = os.Getenv("NETP_CONFIG")
 	}
+	fmt.Printf("Got yaml configuration %v\n", cf)
 	// First, try bootstrapping from the YAML server file
-	a.Config = &APIConfig{}
+	// Defaults below
+	a.Config = &APIConfig{
+		ApiPort: "8999",
+	}
 	// If the yaml file exists
-	if _, err := os.Stat(serverFile); os.IsExist(err) {
+	if _, err := os.Stat(serverFile); err == nil {
 		data, err := ioutil.ReadFile(serverFile)
 		errors.CheckError(err)
 
@@ -47,12 +52,17 @@ func (a *API) Configure(cf string) {
 		errors.CheckError(err)
 	}
 }
+
+/*
+Start the API listener.
+*/
 func (a *API) Run() {
 	// Register to the provided list of servers, if any
 	for _, s := range a.Config.Servers {
 		a.SendRegister(s)
 	}
-	StartServerApi("8999")
+	fmt.Printf("Started API server on %v\n", a.Config.ApiPort)
+	StartServerApi(a.Config.ApiPort)
 }
 
 func StartServerApi(p string) API {
@@ -63,6 +73,7 @@ func StartServerApi(p string) API {
 
 	http.HandleFunc("/register", a.register)
 	http.HandleFunc("/tcpbw", a.bwtest)
+	http.HandleFunc("/clients", a.getclients)
 	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%v", p), nil))
 
 	return a
@@ -93,6 +104,17 @@ func (a *API) bwtest(w http.ResponseWriter, r *http.Request) {
 	body, _ := ioutil.ReadAll(r.Body)
 	json.Unmarshal(body, &cc)
 	fmt.Printf("DEBUG: Got a test request destination: %v\n", cc.Server)
+
+	c := tcpbw.Client{
+		Config: &cc,
+	}
+	c.Run()
+}
+
+func (a *API) getclients(w http.ResponseWriter, r *http.Request) {
+	b, err := json.Marshal(a.Controller.Clients)
+	errors.CheckError(err)
+	w.Write(b)
 }
 
 /*

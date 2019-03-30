@@ -24,7 +24,7 @@ func ParseArgs() Runner {
 	serverMode := flag.Bool("server", false, "Run as netpupper server.")
 	clientMode := flag.Bool("client", false, "Run as netpupper client.")
 	reverse := flag.Bool("reverse", false, "Reverse data direction.")
-	cfgFile := flag.String("config", "./server.yml", "YAML Configuration file")
+	cfgFile := flag.String("config", "./daemon_server.yml", "YAML Configuration file")
 	daemon := flag.Bool("daemon", false, "Run in DAEMON mode and start the API.")
 
 	// CMDLINE Args
@@ -45,13 +45,13 @@ func ParseArgs() Runner {
 	c.Config.Reverse = *reverse
 
 	if *clientMode {
-		fmt.Printf("Started in CLIENT mode")
+		fmt.Printf("Started in CLIENT mode\n")
 		return c
 	} else if *serverMode {
-		fmt.Printf("Started in SERVER mode")
+		fmt.Printf("Started in SERVER mode\n")
 		return s
 	} else if *daemon {
-		fmt.Printf("Started in Daemon mode.")
+		fmt.Printf("Started in Daemon mode.\n")
 		return a
 	} else {
 		return s

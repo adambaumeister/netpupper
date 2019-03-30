@@ -22,7 +22,7 @@ Main struct for tcp bandwidth server
 type Server struct {
 	notifyChan chan bool
 	stopChan   chan bool
-	Config     *ServerConfig
+	Config     *ServerConfig `yaml:"tcpbw"`
 }
 
 type ServerConfig struct {
@@ -43,11 +43,12 @@ func (s *Server) Configure(cf string) {
 	// First, try bootstrapping from the YAML server file
 	s.Config = &ServerConfig{}
 	// If the yaml file exists
-	if _, err := os.Stat(serverFile); os.IsExist(err) {
+	if _, err := os.Stat(serverFile); err == nil {
+		fmt.Printf("yep got here\n")
 		data, err := ioutil.ReadFile(serverFile)
 		errors.CheckError(err)
 
-		err = yaml.Unmarshal(data, s.Config)
+		err = yaml.Unmarshal(data, s)
 		errors.CheckError(err)
 	}
 }
@@ -174,7 +175,7 @@ func (c *Client) Configure(cf string) {
 	// First, try bootstrapping from the YAML server file
 	c.Config = &ClientConfig{}
 	// If the yaml file exists
-	if _, err := os.Stat(f); os.IsExist(err) {
+	if _, err := os.Stat(cf); err == nil {
 		data, err := ioutil.ReadFile(f)
 		errors.CheckError(err)
 
