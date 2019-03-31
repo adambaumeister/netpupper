@@ -20,6 +20,8 @@ type API struct {
 
 	Config     *APIConfig
 	configFile string
+
+	rw http.ResponseWriter
 }
 type APIConfig struct {
 	Servers []string
@@ -112,10 +114,14 @@ func (a *API) bwtest(w http.ResponseWriter, r *http.Request) {
 	body, _ := ioutil.ReadAll(r.Body)
 	json.Unmarshal(body, &cc)
 	fmt.Printf("DEBUG: Got a test request destination: %v\n", cc.Server)
+	// Setup an API test collector. Stats will be sent back to the client.
+	ac := ApiCollector{}
+	ac.SetResponse(w)
 
 	c := tcpbw.Client{
 		Config: &cc,
 	}
+	c.SetTestCollector(&ac)
 	c.Run()
 }
 

@@ -15,4 +15,4 @@ if ($rpi) {
     $Env:GOARCH = ""
 }
 
-c:\Temp\netp.exe -daemon -config='C:\users\adam\go\src\github.com\adamb\netpupper\daemon_server.yml'
+c:\Temp\netp.exe -server -address='127.0.0.1:5000'

@@ -2,12 +2,12 @@ package stats
 
 import (
 	"fmt"
-	"github.com/adamb/netpupper/perf"
 	"time"
 )
 
 type Collector interface {
 	WriteBwTest(BpsResult)
+	WriteSummary(SummaryResult)
 }
 
 type Test struct {
@@ -32,6 +32,10 @@ type BwTestResult struct {
 }
 
 type BpsResult struct {
+	Bps float64
+}
+
+type SummaryResult struct {
 	Bps float64
 }
 
@@ -105,7 +109,11 @@ func (t *Test) Summary() {
 	cbps := float64(tb) / float64(e)
 	// Convert from nano to reg seconds
 	cbps = cbps * 1000000000
-	fmt.Printf("Test summary (len: %v): %v\n", len(t.Queue), perf.ByteToString(uint64(cbps)))
+	//fmt.Printf("Test summary (len: %v): %v\n", len(t.Queue), perf.ByteToString(uint64(cbps)))
+	sr := SummaryResult{
+		Bps: cbps,
+	}
+	t.Collector.WriteSummary(sr)
 }
 
 func (t *Test) End() {

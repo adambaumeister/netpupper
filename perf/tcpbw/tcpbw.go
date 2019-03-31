@@ -150,9 +150,11 @@ func GetUserInput(c chan string, sc chan bool) {
 TCPBW Client struct
 */
 type Client struct {
-	notifyChan chan bool
-	stopChan   chan bool
-	Config     *ClientConfig
+	notifyChan    chan bool
+	stopChan      chan bool
+	testCollector stats.Collector
+
+	Config *ClientConfig
 }
 
 type ClientConfig struct {
@@ -184,6 +186,14 @@ func (c *Client) Configure(cf string) {
 	}
 }
 
+/*
+Set the Test format
+By default, tests use Stdout class.
+*/
+func (c *Client) SetTestCollector(sc stats.Collector) {
+	c.testCollector = sc
+}
+
 func (c *Client) Run() {
 	c.stopChan = make(chan bool)
 	c.notifyChan = make(chan bool)
@@ -204,6 +214,11 @@ func (c *Client) Run() {
 	} else {
 		SendOpen(conn, dl, 0)
 	}
+	test := stats.InitTest()
+	// Test collector
+	if c.testCollector != nil {
+		test.Collector = c.testCollector
+	}
 
 	// Wait for a confirmation
 	h := ReadHeader(conn)
@@ -212,7 +227,6 @@ func (c *Client) Run() {
 		if c.Config.Reverse {
 			fmt.Printf("OPEN Request for reverse mode confirmed. Receiving data %v...\n", dl)
 			// Initilize a test for storing the results
-			test := stats.InitTest()
 			timedRead(conn, dl, test.InMsgs, c.stopChan)
 			//GetUserInput(test.InReqs, c.stopChan)
 			// Schedule the test interval function
@@ -222,7 +236,6 @@ func (c *Client) Run() {
 		} else {
 			fmt.Printf("OPEN Request confirmed. Sending data.\n")
 			// Initilize a test for storing the results
-			test := stats.InitTest()
 			timedSend(conn, dl, test.InMsgs, c.stopChan)
 			//GetUserInput(test.InReqs, c.stopChan)
 			test.End()
