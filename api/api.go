@@ -28,6 +28,12 @@ type APIConfig struct {
 	ApiPort string
 }
 
+func enableCors(w *http.ResponseWriter) {
+	(*w).Header().Set("Access-Control-Allow-Origin", "*")
+	(*w).Header().Set("Access-Control-Allow-Headers", "Content-Type")
+	(*w).Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT")
+}
+
 /*
 Configure the API
 Returns TRUE if this method matches the requested config
@@ -96,9 +102,8 @@ func (a *API) register(w http.ResponseWriter, r *http.Request) {
 	reg := controller.Client{}
 	body, _ := ioutil.ReadAll(r.Body)
 	json.Unmarshal(body, &reg)
-	a.Controller.AddClient(reg)
-
 	reg.Addr = strings.Split(r.RemoteAddr, ":")[0]
+	a.Controller.AddClient(reg)
 
 	m := Message{
 		Value: fmt.Sprintf("%v registered to controller.", reg.Addr),
@@ -110,12 +115,23 @@ func (a *API) register(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *API) bwtest(w http.ResponseWriter, r *http.Request) {
-	cc := tcpbw.ClientConfig{}
-	body, _ := ioutil.ReadAll(r.Body)
-	json.Unmarshal(body, &cc)
-	fmt.Printf("DEBUG: Got a test request destination: %v\n", cc.Server)
+	var cc tcpbw.ClientConfig
+	body, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		panic(err)
+	}
+	err = json.Unmarshal(body, &cc)
+
+	//json.Unmarshal(body, &cc)
+	fmt.Printf("DEBUG: Got a test request destination: %v\n", cc.Bytes)
 	// Setup an API test collector. Stats will be sent back to the client.
 	ac := ApiCollector{}
+	enableCors(&w)
+	(w).Header().Set("Content-type", "application/json")
+	if r.Method == "OPTIONS" {
+		return
+	}
+
 	ac.SetResponse(w)
 
 	c := tcpbw.Client{
@@ -126,6 +142,7 @@ func (a *API) bwtest(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *API) getclients(w http.ResponseWriter, r *http.Request) {
+	enableCors(&w)
 	b, err := json.Marshal(a.Controller.Clients)
 	errors.CheckError(err)
 	w.Write(b)
