@@ -2,11 +2,13 @@ package tcpbw
 
 import (
 	"bufio"
+	"crypto/rand"
 	"fmt"
 	"github.com/adamb/netpupper/errors"
 	"github.com/adamb/netpupper/perf"
 	"github.com/adamb/netpupper/perf/stats"
 	"gopkg.in/yaml.v2"
+	"io"
 	"io/ioutil"
 	"net"
 	"os"
@@ -256,13 +258,20 @@ func timedRead(conn net.Conn, rl uint64, nc chan stats.BwTestResult, sc chan boo
 	fmt.Printf("Receiving: %v\n", rl)
 	lt := start
 	// Chunk size is how much we read at each time interval
-	chunk := 1000
+	chunk := 50000
 	currentChunk := uint64(0)
-	chunkData := make([]byte, chunk)
+
 	// Read each chunk until we've read the entire thing
 	for currentChunk < rl {
-
-		_, err := conn.Read(chunkData)
+		chunkData := make([]byte, chunk)
+		/// HERE IS THE PROBLEM!!!
+		// conn.read does NOT read the provided amount of bytes while blocking.
+		// Instead, it reads each window size before returning the amount of bytes read!
+		// This breaks the logic here which assumes we read the full chunk size while blocking.
+		// What a mess!
+		// io.ReadFull appears to fix.
+		_, err := io.ReadFull(conn, chunkData)
+		//fmt.Printf("Read bytes: %v\n", n)
 		errors.CheckError(err)
 		var e uint64
 
@@ -283,11 +292,11 @@ func timedRead(conn net.Conn, rl uint64, nc chan stats.BwTestResult, sc chan boo
 		lt = t
 
 		currentChunk = currentChunk + uint64(chunk)
-		//fmt.Printf("Chunk: %v data: %v\n", currentChunk, chunkData[0:2])
 
 	}
 	// Signal that the read is finished on the read end.
 	SendClose(conn)
+	conn.Close()
 	return
 }
 
@@ -301,7 +310,7 @@ func timedSend(conn net.Conn, sl uint64, nc chan stats.BwTestResult, sc chan boo
 	start := time.Now().UnixNano()
 	lt := start
 	// Chunk size is how much we read at each time interval
-	chunk := 1000
+	chunk := 50000
 	currentChunk := uint64(0)
 	// Read each chunk until we've read the entire thing
 	var e uint64
@@ -309,8 +318,9 @@ func timedSend(conn net.Conn, sl uint64, nc chan stats.BwTestResult, sc chan boo
 	fmt.Printf("Sending: %v\n", sl)
 	for currentChunk < sl {
 		chunkData := make([]byte, chunk)
-		//rand.Read(chunkData)
+		rand.Read(chunkData)
 		_, err := conn.Write(chunkData)
+		//time.Sleep(2*time.Second)
 		errors.CheckError(err)
 		// Read the current time
 		t := time.Now().UnixNano()
@@ -336,6 +346,7 @@ func timedSend(conn net.Conn, sl uint64, nc chan stats.BwTestResult, sc chan boo
 		// Append each read chunk to the full data array
 		// Don't do this, obviously it fills ya data up fam
 		//data = append(data, chunkData...)
+		//fmt.Printf("Sent chunk: %v\n", currentChunk)
 		currentChunk = currentChunk + uint64(chunk)
 	}
 	fmt.Printf("waiting for close...")
