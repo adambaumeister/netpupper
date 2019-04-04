@@ -1,5 +1,11 @@
 servers:
-  - 127.0.0.1:8999
+  #- 127.0.0.1:8999
+  - rpi.home:8999
 tcpbw:
-  address: 127.0.0.1:4999
+  address: :4999
 apiport: 8998
+tags:
+  - name: lat
+    value: -35.351023
+  - name: lon
+    value: 149.064355

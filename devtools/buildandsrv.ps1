@@ -1,5 +1,6 @@
  param (
-    [switch]$rpi = $false
+    [switch]$rpi = $false,
+    [switch]$buildsrv = $false
  )
 
 go build -o c:\Temp\netp.exe
@@ -10,6 +11,17 @@ if ($rpi) {
     $Env:GOARM = 7
     go build -o c:\Temp\netp_pi
     scp c:\Temp\netp_pi pi@rpi.home:code/
+
+    $Env:GOOS = ""
+    $Env:GOARCH = ""
+}
+
+if ($buildsrv) {
+    write-output "Doing buildsrv"
+    $Env:GOOS = "linux"
+    $Env:GOARCH = "amd64"
+    go build -o c:\Temp\netp_pi_amd
+    scp c:\Temp\netp_pi_amd adam@buildserver.home:
 
     $Env:GOOS = ""
     $Env:GOARCH = ""

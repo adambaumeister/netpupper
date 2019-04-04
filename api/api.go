@@ -26,12 +26,14 @@ type API struct {
 type APIConfig struct {
 	Servers []string
 	ApiPort string
+	Tags    []controller.Tag
 }
 
 func enableCors(w *http.ResponseWriter) {
 	(*w).Header().Set("Access-Control-Allow-Origin", "*")
 	(*w).Header().Set("Access-Control-Allow-Headers", "Content-Type")
 	(*w).Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT")
+	(*w).Header().Set("Content-type", "application/json")
 }
 
 /*
@@ -122,16 +124,15 @@ func (a *API) bwtest(w http.ResponseWriter, r *http.Request) {
 	}
 	err = json.Unmarshal(body, &cc)
 
-	//json.Unmarshal(body, &cc)
-	fmt.Printf("DEBUG: Got a test request destination: %v\n", cc.Bytes)
 	// Setup an API test collector. Stats will be sent back to the client.
 	ac := ApiCollector{}
 	enableCors(&w)
-	(w).Header().Set("Content-type", "application/json")
+
+	// Required for CORS to work.
 	if r.Method == "OPTIONS" {
 		return
 	}
-
+	fmt.Printf("DEBUG: Got a test request destination: %v\n", cc.Server)
 	ac.SetResponse(w)
 
 	c := tcpbw.Client{
@@ -176,7 +177,7 @@ func (a *API) SendRegister(server string) {
 		Name:  "name",
 		Value: host,
 	}
-	tags := []controller.Tag{gt}
+	tags := append(a.Config.Tags, gt)
 	reg := controller.Client{
 		Tags: tags,
 	}

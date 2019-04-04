@@ -2,7 +2,6 @@ package tcpbw
 
 import (
 	"bufio"
-	"crypto/rand"
 	"fmt"
 	"github.com/adamb/netpupper/errors"
 	"github.com/adamb/netpupper/perf"
@@ -308,10 +307,9 @@ func timedSend(conn net.Conn, sl uint64, nc chan stats.BwTestResult, sc chan boo
 	var e uint64
 	var cbps float64
 	fmt.Printf("Sending: %v\n", sl)
-	chunkData := make([]byte, chunk)
 	for currentChunk < sl {
-
-		rand.Read(chunkData)
+		chunkData := make([]byte, chunk)
+		//rand.Read(chunkData)
 		_, err := conn.Write(chunkData)
 		errors.CheckError(err)
 		// Read the current time
@@ -339,8 +337,8 @@ func timedSend(conn net.Conn, sl uint64, nc chan stats.BwTestResult, sc chan boo
 		// Don't do this, obviously it fills ya data up fam
 		//data = append(data, chunkData...)
 		currentChunk = currentChunk + uint64(chunk)
-		//fmt.Printf("Chunk: %v data: %v\n", currentChunk,chunkData[0:2])
 	}
+	fmt.Printf("waiting for close...")
 	t := time.Now().UnixNano()
 	e = uint64(t - start)
 	cbps = float64(sl) / float64(e)
