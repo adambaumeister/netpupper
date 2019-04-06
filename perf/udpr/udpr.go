@@ -1,7 +1,6 @@
 package udpr
 
 import (
-	"encoding/binary"
 	"fmt"
 	"github.com/adamb/netpupper/errors"
 	"github.com/adamb/netpupper/perf/stats"
@@ -55,10 +54,18 @@ func (s *Server) Run() {
 	errors.CheckError(err)
 	for {
 		packet := make([]byte, 1500)
-		// Read the max number of bytes in a datagram(1500) into a variable length slice of bytes, 'Buffer'
-		// Also set the total number of bytes read so we can check it later
-		n, addr, _ := conn.ReadFromUDP(packet)
-		fmt.Printf("Got %v bytes from %v.", n, addr.IP)
+		_, addr, err := conn.ReadFromUDP(packet)
+
+		errors.CheckError(err)
+		h := ReadHeader(packet)
+		switch {
+		case h.PacketType.Value == OPEN_TYPE:
+			var o Open
+			o = ReadOpen(packet)
+			fmt.Printf("Got UDP Open from %v : %v\n.", addr.IP, o.DataLength)
+			SendConfirm(conn, addr)
+		}
+
 	}
 }
 
@@ -102,6 +109,14 @@ func (c *Client) Run() {
 
 	conn, err := net.Dial("udp", c.Config.Server)
 	errors.CheckError(err)
-	b := []byte{255, 255}
-	err = binary.Write(conn, binary.BigEndian, b)
+	SendOpen(conn, 65536, 100)
+	packet := make([]byte, 1500)
+	_, err = conn.Read(packet)
+	errors.CheckError(err)
+
+	h := ReadHeader(packet)
+	switch {
+	case h.PacketType.Value == CONFIRM_TYPE:
+		fmt.Printf("UDP stream confirmed.")
+	}
 }

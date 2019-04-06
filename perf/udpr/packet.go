@@ -14,7 +14,8 @@ const CLOSE_TYPE = 3
 const PACKETTYPE_LENGTH = 2
 const PACKETLEN_LENGTH = 2
 
-const OPEN_LENGTH = 10
+const HEADER_LENGTH = 4
+const OPEN_LENGTH = 12
 
 type Packet struct {
 	Header  *Header
@@ -42,19 +43,17 @@ Open message, used to initiate a transfer
 */
 type Open struct {
 	DataLength uint64
-	Reverse    uint16
+	AckCount   uint32
 }
 
 func (m *Open) Serialize() []byte {
 	b := make([]byte, OPEN_LENGTH)
 	binary.BigEndian.PutUint64(b[:8], m.DataLength)
-	binary.BigEndian.PutUint16(b[8:10], m.Reverse)
-	fmt.Printf("Bytes send: %v", b[8:10])
 	return b
 }
-func (m *Open) Write(i uint64, r uint16) {
+func (m *Open) Write(i uint64, ac uint32) {
 	m.DataLength = i
-	m.Reverse = r
+	m.AckCount = ac
 }
 
 /*
@@ -78,11 +77,9 @@ func (h *Header) Serialize() []byte {
 
 	return b
 }
-func ReadHeader(c net.Conn) Header {
+
+func HeaderFromBytes(b []byte) Header {
 	h := Header{}
-	var b = make([]byte, 4)
-	_, err := c.Read(b)
-	errors.CheckError(err)
 	h.PacketType = &IntField{
 		Length: PACKETTYPE_LENGTH,
 	}
@@ -94,14 +91,15 @@ func ReadHeader(c net.Conn) Header {
 	return h
 }
 
-func ReadOpen(c net.Conn) Open {
-	var b = make([]byte, OPEN_LENGTH)
-	_, err := c.Read(b)
-	errors.CheckError(err)
+func ReadHeader(packet []byte) Header {
+	h := HeaderFromBytes(packet[:HEADER_LENGTH])
 
+	return h
+}
+
+func ReadOpen(b []byte) Open {
 	o := Open{}
-	o.DataLength = binary.BigEndian.Uint64(b[:8])
-	o.Reverse = binary.BigEndian.Uint16(b[8:10])
+	o.DataLength = binary.BigEndian.Uint64(b[HEADER_LENGTH:12])
 	return o
 }
 
@@ -112,27 +110,26 @@ func ReadData(conn net.Conn, l uint64) []byte {
 	return b
 }
 
-func ReadPacket(conn net.Conn) Packet {
-	h := ReadHeader(conn)
+func ReadPacket(c *net.UDPConn) (Packet, *net.UDPAddr) {
+	packet := make([]byte, 1500)
+	_, addr, err := c.ReadFromUDP(packet)
+
+	errors.CheckError(err)
+	h := ReadHeader(packet)
 
 	p := Packet{}
 	p.Header = &h
-	switch {
-	case p.Header.PacketType.Value == OPEN_TYPE:
-		o := ReadOpen(conn)
-		p.Message = &o
-	}
-
-	return p
+	fmt.Printf("Got this far %v  !", p.Header.PacketType.Value)
+	return p, addr
 }
 
 /*
 SendOpen
 	conn: Net.conn instance
-	dl:	Data length
-	r: Reverse option
+	dl:	Total length of UDP trans, 0 for infinite
+	ac: Ack count - count of packets to require an acknowelegement
 */
-func SendOpen(conn net.Conn, dl uint64, r uint16) {
+func SendOpen(conn net.Conn, dl uint64, ac uint32) {
 	h := Header{}
 	pl := IntField{}
 	pl.Write(4)
@@ -146,7 +143,7 @@ func SendOpen(conn net.Conn, dl uint64, r uint16) {
 	p.Header = &h
 	msg := Open{}
 
-	msg.Write(dl, r)
+	msg.Write(dl, ac)
 
 	p.Message = &msg
 	b := p.Serialize()
@@ -154,7 +151,7 @@ func SendOpen(conn net.Conn, dl uint64, r uint16) {
 	errors.CheckError(err)
 }
 
-func SendConfirm(conn net.Conn) {
+func SendConfirm(conn *net.UDPConn, a *net.UDPAddr) {
 	p := Header{}
 	pl := IntField{}
 	pl.Write(4)
@@ -165,7 +162,7 @@ func SendConfirm(conn net.Conn) {
 	p.AddField(&pt)
 
 	b := p.Serialize()
-	_, err := conn.Write(b)
+	_, err := conn.WriteToUDP(b, a)
 	errors.CheckError(err)
 }
 
