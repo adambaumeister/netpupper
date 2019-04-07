@@ -10,12 +10,15 @@ import (
 const OPEN_TYPE = 1
 const CONFIRM_TYPE = 2
 const CLOSE_TYPE = 3
+const DG_TYPE = 4
+const ACK_TYPE = 5
 
 const PACKETTYPE_LENGTH = 2
 const PACKETLEN_LENGTH = 2
 
 const HEADER_LENGTH = 4
 const OPEN_LENGTH = 12
+const DG_MIN_LENGTH = 2
 
 type Packet struct {
 	Header  *Header
@@ -54,6 +57,26 @@ func (m *Open) Serialize() []byte {
 func (m *Open) Write(i uint64, ac uint32) {
 	m.DataLength = i
 	m.AckCount = ac
+}
+
+/*
+Datagram message, sends data
+	Datalength: Length of data in this datagram
+*/
+type Datagram struct {
+	DataLength uint16
+	Data       []byte
+}
+
+func (m *Datagram) Serialize() []byte {
+	b := make([]byte, 2+m.DataLength)
+	binary.BigEndian.PutUint16(b[:2], m.DataLength)
+	b = append(b, m.Data...)
+	return b
+}
+func (m *Datagram) Write(b []byte) {
+	m.DataLength = uint16(len(b))
+	m.Data = b
 }
 
 /*
@@ -103,11 +126,14 @@ func ReadOpen(b []byte) Open {
 	return o
 }
 
-func ReadData(conn net.Conn, l uint64) []byte {
-	var b = make([]byte, l)
-	_, err := conn.Read(b)
-	errors.CheckError(err)
-	return b
+func ReadDatagram(b []byte) Datagram {
+	d := Datagram{}
+	// Cut out the header
+	b = b[HEADER_LENGTH:]
+	// First two bytes are the length
+	d.DataLength = binary.BigEndian.Uint16(b[:2])
+	d.Data = b[2:]
+	return d
 }
 
 func ReadPacket(c *net.UDPConn) (Packet, *net.UDPAddr) {
@@ -163,6 +189,30 @@ func SendConfirm(conn *net.UDPConn, a *net.UDPAddr) {
 
 	b := p.Serialize()
 	_, err := conn.WriteToUDP(b, a)
+	errors.CheckError(err)
+}
+
+func SendDatagram(conn net.Conn, a *net.UDPAddr, data []byte) {
+	h := Header{}
+	pt := IntField{}
+	pt.Write(DG_TYPE)
+
+	dg := Datagram{}
+	dg.Write(data)
+
+	pl := IntField{}
+	pl.Write(4 + DG_MIN_LENGTH + dg.DataLength)
+
+	h.AddField(&pl)
+	h.AddField(&pt)
+
+	p := Packet{}
+	p.Header = &h
+	p.Message = &dg
+
+	b := p.Serialize()
+
+	_, err := conn.Write(b)
 	errors.CheckError(err)
 }
 

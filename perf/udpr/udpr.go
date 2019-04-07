@@ -64,6 +64,8 @@ func (s *Server) Run() {
 			o = ReadOpen(packet)
 			fmt.Printf("Got UDP Open from %v : %v\n.", addr.IP, o.DataLength)
 			SendConfirm(conn, addr)
+
+			countedRead(conn, o.AckCount, o.DataLength)
 		}
 
 	}
@@ -118,5 +120,27 @@ func (c *Client) Run() {
 	switch {
 	case h.PacketType.Value == CONFIRM_TYPE:
 		fmt.Printf("UDP stream confirmed.")
+		addr, _ := net.ResolveUDPAddr("udp", c.Config.Server)
+		countedSend(conn, addr, 100, 65536)
 	}
+}
+
+/* Read from the connection
+Will send an ACK every AckCount packets (ac)
+Ends after max length
+*/
+func countedRead(conn *net.UDPConn, ac uint32, ml uint64) {
+	packet := make([]byte, 1500)
+	_, err := conn.Read(packet)
+	errors.CheckError(err)
+
+	h := ReadHeader(packet)
+	if h.PacketType.Value == DG_TYPE {
+		ReadDatagram(packet)
+		fmt.Printf("Got a datagram\n")
+	}
+}
+
+func countedSend(conn net.Conn, addr *net.UDPAddr, ac uint32, ml uint64) {
+	SendDatagram(conn, addr, []byte{1, 1, 1, 1})
 }
