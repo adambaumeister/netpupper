@@ -2,6 +2,7 @@ package udpr
 
 import (
 	"testing"
+	"time"
 )
 
 func TestClient_Run(t *testing.T) {
@@ -14,5 +15,5 @@ func TestClient_Run(t *testing.T) {
 	c.Configure("")
 	c.Config.Server = "127.0.0.1:9500"
 	c.Run()
-	//time.Sleep(1*time.Second)
+	time.Sleep(2 * time.Second)
 }

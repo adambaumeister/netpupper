@@ -2,7 +2,6 @@ package udpr
 
 import (
 	"encoding/binary"
-	"fmt"
 	"github.com/adamb/netpupper/errors"
 	"net"
 )
@@ -18,7 +17,7 @@ const PACKETLEN_LENGTH = 2
 
 const HEADER_LENGTH = 4
 const OPEN_LENGTH = 12
-const DG_MIN_LENGTH = 2
+const DG_MIN_LENGTH = 10
 
 type Packet struct {
 	Header  *Header
@@ -62,20 +61,25 @@ func (m *Open) Write(i uint64, ac uint32) {
 /*
 Datagram message, sends data
 	Datalength: Length of data in this datagram
+	Sequence: Sequence number of this UDP packet
+	Data: Actual data contained within this datagram
 */
 type Datagram struct {
 	DataLength uint16
+	Sequence   uint64
 	Data       []byte
 }
 
 func (m *Datagram) Serialize() []byte {
-	b := make([]byte, 2+m.DataLength)
+	b := make([]byte, 10)
 	binary.BigEndian.PutUint16(b[:2], m.DataLength)
+	binary.BigEndian.PutUint64(b[2:10], m.Sequence)
 	b = append(b, m.Data...)
 	return b
 }
-func (m *Datagram) Write(b []byte) {
+func (m *Datagram) Write(b []byte, sn uint64) {
 	m.DataLength = uint16(len(b))
+	m.Sequence = sn
 	m.Data = b
 }
 
@@ -130,9 +134,12 @@ func ReadDatagram(b []byte) Datagram {
 	d := Datagram{}
 	// Cut out the header
 	b = b[HEADER_LENGTH:]
+
 	// First two bytes are the length
 	d.DataLength = binary.BigEndian.Uint16(b[:2])
-	d.Data = b[2:]
+	// Next 8 are sequence number
+	d.Sequence = binary.BigEndian.Uint64(b[2:10])
+	d.Data = b[10 : 10+d.DataLength]
 	return d
 }
 
@@ -145,7 +152,6 @@ func ReadPacket(c *net.UDPConn) (Packet, *net.UDPAddr) {
 
 	p := Packet{}
 	p.Header = &h
-	fmt.Printf("Got this far %v  !", p.Header.PacketType.Value)
 	return p, addr
 }
 
@@ -192,14 +198,13 @@ func SendConfirm(conn *net.UDPConn, a *net.UDPAddr) {
 	errors.CheckError(err)
 }
 
-func SendDatagram(conn net.Conn, a *net.UDPAddr, data []byte) {
+func SendDatagram(conn net.Conn, sn uint64, data []byte) {
 	h := Header{}
 	pt := IntField{}
 	pt.Write(DG_TYPE)
 
 	dg := Datagram{}
-	dg.Write(data)
-
+	dg.Write(data, sn)
 	pl := IntField{}
 	pl.Write(4 + DG_MIN_LENGTH + dg.DataLength)
 
@@ -211,7 +216,6 @@ func SendDatagram(conn net.Conn, a *net.UDPAddr, data []byte) {
 	p.Message = &dg
 
 	b := p.Serialize()
-
 	_, err := conn.Write(b)
 	errors.CheckError(err)
 }
