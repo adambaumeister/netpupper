@@ -51,6 +51,7 @@ type Open struct {
 func (m *Open) Serialize() []byte {
 	b := make([]byte, OPEN_LENGTH)
 	binary.BigEndian.PutUint64(b[:8], m.DataLength)
+	binary.BigEndian.PutUint32(b[8:12], m.AckCount)
 	return b
 }
 func (m *Open) Write(i uint64, ac uint32) {
@@ -127,6 +128,7 @@ func ReadHeader(packet []byte) Header {
 func ReadOpen(b []byte) Open {
 	o := Open{}
 	o.DataLength = binary.BigEndian.Uint64(b[HEADER_LENGTH:12])
+	o.AckCount = binary.BigEndian.Uint32(b[12:16])
 	return o
 }
 

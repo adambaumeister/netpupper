@@ -65,6 +65,7 @@ func InitTest() *Test {
 	t.ReliabilityQueue = []ReliabilityResult{}
 
 	t.InBpsTests = make(chan BwTestResult)
+	t.InRelTests = make(chan ReliabilityResult)
 	t.InReqs = make(chan string)
 
 	t.Stop = make(chan bool)
@@ -183,7 +184,9 @@ func (t *Test) Listen() {
 		case <-t.InReqs:
 			t.Current()
 		case m := <-t.InBpsTests:
-			t.AddResult(m)
+			t.AddBwResult(m)
+		case m := <-t.InRelTests:
+			t.AddRelResult(m)
 		case <-t.Stop:
 			fmt.Printf("Test finished.\n")
 			return
@@ -191,6 +194,10 @@ func (t *Test) Listen() {
 	}
 }
 
-func (t *Test) AddResult(tr BwTestResult) {
+func (t *Test) AddBwResult(tr BwTestResult) {
 	t.BpsQueue = append(t.BpsQueue, tr)
+}
+
+func (t *Test) AddRelResult(r ReliabilityResult) {
+	t.ReliabilityQueue = append(t.ReliabilityQueue, r)
 }

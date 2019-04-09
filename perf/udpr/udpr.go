@@ -39,7 +39,6 @@ func (s *Server) Configure(cf string) {
 		errors.CheckError(err)
 
 		err = yaml.Unmarshal(data, s)
-		fmt.Printf("yep got here: %v\n", s.Config.Address)
 		errors.CheckError(err)
 	}
 }
@@ -62,10 +61,12 @@ func (s *Server) Run() {
 		case h.PacketType.Value == OPEN_TYPE:
 			var o Open
 			o = ReadOpen(packet)
-			fmt.Printf("Got UDP Open from %v : %v\n.", addr.IP, o.DataLength)
+			fmt.Printf("Got UDP Open from %v : %v : %v\n.", addr.IP, o.DataLength, o.AckCount)
 			SendConfirm(conn, addr)
 			ut := InitUdpSm(conn, addr, o.AckCount, o.DataLength)
-			ut.countedRead()
+			test := stats.InitTest()
+			ut.countedRead(test)
+			test.End()
 		}
 	}
 }
@@ -110,7 +111,7 @@ func (c *Client) Run() {
 
 	conn, err := net.Dial("udp", c.Config.Server)
 	errors.CheckError(err)
-	SendOpen(conn, 100, 100)
+	SendOpen(conn, 500, 100)
 	packet := make([]byte, 1500)
 	_, err = conn.Read(packet)
 	errors.CheckError(err)
@@ -123,7 +124,8 @@ func (c *Client) Run() {
 		addr, _ := net.ResolveUDPAddr("udp", c.Config.Server)
 
 		// start the state machine
-		ut := InitUdpSm(conn, addr, 100, 100)
-		ut.countedSend()
+		ut := InitUdpSm(conn, addr, 100, 500)
+		ut.countedSend(test)
+		test.End()
 	}
 }

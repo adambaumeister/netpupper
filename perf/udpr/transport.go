@@ -3,6 +3,7 @@ package udpr
 import (
 	"fmt"
 	"github.com/adamb/netpupper/errors"
+	"github.com/adamb/netpupper/perf/stats"
 	"net"
 )
 
@@ -43,9 +44,9 @@ func InitUdpSm(conn net.Conn, addr *net.UDPAddr, ac uint32, ml uint64) UdpTransp
 Will send an ACK every AckCount packets (ac)
 Ends after max length
 */
-func (u *UdpTransport) countedRead() {
+func (u *UdpTransport) countedRead(test *stats.Test) {
 	packet := make([]byte, 1500)
-
+	count := uint32(0)
 	// Read all incoming udp packets
 	for u.CurrentSequence < u.maxlength {
 		_, err := u.conn.Read(packet)
@@ -54,21 +55,31 @@ func (u *UdpTransport) countedRead() {
 		h := ReadHeader(packet)
 		if h.PacketType.Value == DG_TYPE {
 			d := ReadDatagram(packet)
-			fmt.Printf("Got a datagram. sequence %v Data: %vb\n", d.Sequence, d.Data)
 			u.CheckSequence(d)
 			u.CurrentSequence = d.Sequence
 		}
+		if count == u.window {
+			r := stats.ReliabilityResult{
+				Loss:          len(u.Buffer),
+				EffectiveLoss: len(u.EffectiveLost),
+			}
+			test.InRelTests <- r
+			fmt.Printf("Sending stats at %v %v %v\n", u.CurrentSequence, u.window, count)
+			count = 0
+		}
+		count = count + 1
 	}
 	fmt.Printf("finished read. Lost: %v, Eff Lost: %v\n", len(u.Buffer), len(u.EffectiveLost))
 
 }
 
-func (u *UdpTransport) countedSend() {
+func (u *UdpTransport) countedSend(test *stats.Test) {
+
 	for u.CurrentSequence <= u.maxlength {
+
 		SendDatagram(u.conn, u.CurrentSequence, []byte{1, 1, 1, 1})
 		u.CurrentSequence = u.CurrentSequence + 1
 	}
-	fmt.Printf("Got here")
 }
 
 func (u *UdpTransport) CheckSequence(d Datagram) {
