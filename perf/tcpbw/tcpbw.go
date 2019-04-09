@@ -87,7 +87,7 @@ func (s *Server) ClientToServer(conn net.Conn, o *Open) {
 
 	// Initilize a test for storing the results
 	test := stats.InitTest()
-	timedRead(conn, o.DataLength, test.InMsgs, s.stopChan)
+	timedRead(conn, o.DataLength, test.InBpsTests, s.stopChan)
 	// Schedule the test interval function
 	//GetUserInput(test.InReqs, s.stopChan)
 	// End the test and print the summary
@@ -99,7 +99,7 @@ func (s *Server) ServerToClient(conn net.Conn, o *Open) {
 	SendConfirm(conn)
 	// Initilize a test for storing the results
 	test := stats.InitTest()
-	timedSend(conn, o.DataLength, test.InMsgs, s.stopChan)
+	timedSend(conn, o.DataLength, test.InBpsTests, s.stopChan)
 	// Schedule the test interval function
 	//GetUserInput(test.InReqs, s.stopChan)
 	// End the test and print the summary
@@ -228,7 +228,7 @@ func (c *Client) Run() {
 		if c.Config.Reverse {
 			fmt.Printf("OPEN Request for reverse mode confirmed. Receiving data %v...\n", dl)
 			// Initilize a test for storing the results
-			timedRead(conn, dl, test.InMsgs, c.stopChan)
+			timedRead(conn, dl, test.InBpsTests, c.stopChan)
 			//GetUserInput(test.InReqs, c.stopChan)
 			// Schedule the test interval function
 			test.End()
@@ -237,7 +237,7 @@ func (c *Client) Run() {
 		} else {
 			fmt.Printf("OPEN Request confirmed. Sending data.\n")
 			// Initilize a test for storing the results
-			timedSend(conn, dl, test.InMsgs, c.stopChan)
+			timedSend(conn, dl, test.InBpsTests, c.stopChan)
 			//GetUserInput(test.InReqs, c.stopChan)
 			test.End()
 			test.Summary()

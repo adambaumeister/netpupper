@@ -7,16 +7,21 @@ import (
 
 type Collector interface {
 	WriteBwTest(BpsResult)
-	WriteSummary(SummaryResult)
+	WriteBwSummary(BpsSummaryResult)
+	WriteReliabilityTest(ReliabilityResult)
+	WriteReliabilitySummary(result ReliabilitySummaryResult)
 }
 
 type Test struct {
-	StartTime int64
-	Queue     []BwTestResult
-	InMsgs    chan BwTestResult
-	InReqs    chan string
+	StartTime        int64
+	BpsQueue         []BwTestResult
+	ReliabilityQueue []ReliabilityResult
 
-	Stop    chan bool
+	InBpsTests chan BwTestResult
+	InRelTests chan ReliabilityResult
+	InReqs     chan string
+	Stop       chan bool
+
 	EndTime int64
 
 	Collector Collector
@@ -35,7 +40,16 @@ type BpsResult struct {
 	Bps float64
 }
 
-type SummaryResult struct {
+type ReliabilityResult struct {
+	Loss          int
+	EffectiveLoss int
+}
+type ReliabilitySummaryResult struct {
+	Loss          int
+	EffectiveLoss int
+}
+
+type BpsSummaryResult struct {
 	Bps float64
 }
 
@@ -47,9 +61,12 @@ func InitTest() *Test {
 	t := Test{}
 	t.Collector = &StdoutCollector{}
 
-	t.Queue = []BwTestResult{}
-	t.InMsgs = make(chan BwTestResult)
+	t.BpsQueue = []BwTestResult{}
+	t.ReliabilityQueue = []ReliabilityResult{}
+
+	t.InBpsTests = make(chan BwTestResult)
 	t.InReqs = make(chan string)
+
 	t.Stop = make(chan bool)
 	t.StartTime = time.Now().UnixNano()
 	go t.Listen()
@@ -80,40 +97,74 @@ func (t *Test) IntervalReport(i int) {
 }
 
 func (t *Test) Current() {
-	// total bytes
-	tb := 0
-	// Elapsed time
-	et := uint64(0)
-	for _, tr := range t.Queue {
-		tb = tb + tr.Bytes
-		et = et + tr.Elapsed
+	// If there are enqueued bps results
+	if len(t.BpsQueue) > 0 {
+		// total bytes
+		tb := 0
+		// Elapsed time
+		et := uint64(0)
+		for _, tr := range t.BpsQueue {
+			tb = tb + tr.Bytes
+			et = et + tr.Elapsed
+		}
+
+		// divide the total bytes by the total elapsed time
+		cbps := float64(tb) / float64(et)
+		// Convert from nano to reg seconds
+		cbps = cbps * 1000000000
+		tr := BpsResult{
+			Bps: cbps,
+		}
+		t.Collector.WriteBwTest(tr)
 	}
 
-	// divide the total bytes by the total elapsed time
-	cbps := float64(tb) / float64(et)
-	// Convert from nano to reg seconds
-	cbps = cbps * 1000000000
-	tr := BpsResult{
-		Bps: cbps,
-	}
-	t.Collector.WriteBwTest(tr)
+	if len(t.ReliabilityQueue) > 0 {
+		totalLoss := 0
+		totalef := 0
 
+		for _, tr := range t.ReliabilityQueue {
+			totalLoss = tr.Loss + totalLoss
+			totalef = tr.EffectiveLoss + totalef
+		}
+		sr := ReliabilityResult{
+			Loss:          totalLoss,
+			EffectiveLoss: totalef,
+		}
+		t.Collector.WriteReliabilityTest(sr)
+	}
 }
 
 func (t *Test) Summary() {
-	tb := 0
-	for _, tr := range t.Queue {
-		tb = tb + tr.Bytes
+	if len(t.BpsQueue) > 0 {
+		tb := 0
+		for _, tr := range t.BpsQueue {
+			tb = tb + tr.Bytes
+		}
+		e := uint64(t.EndTime - t.StartTime)
+		cbps := float64(tb) / float64(e)
+		// Convert from nano to reg seconds
+		cbps = cbps * 1000000000
+		//fmt.Printf("Test summary (len: %v): %v\n", len(t.BpsQueue), perf.ByteToString(uint64(cbps)))
+		sr := BpsSummaryResult{
+			Bps: cbps,
+		}
+		t.Collector.WriteBwSummary(sr)
 	}
-	e := uint64(t.EndTime - t.StartTime)
-	cbps := float64(tb) / float64(e)
-	// Convert from nano to reg seconds
-	cbps = cbps * 1000000000
-	//fmt.Printf("Test summary (len: %v): %v\n", len(t.Queue), perf.ByteToString(uint64(cbps)))
-	sr := SummaryResult{
-		Bps: cbps,
+
+	if len(t.ReliabilityQueue) > 0 {
+		totalLoss := 0
+		totalef := 0
+
+		for _, tr := range t.ReliabilityQueue {
+			totalLoss = tr.Loss + totalLoss
+			totalef = tr.EffectiveLoss + totalef
+		}
+		sr := ReliabilitySummaryResult{
+			Loss:          totalLoss,
+			EffectiveLoss: totalef,
+		}
+		t.Collector.WriteReliabilitySummary(sr)
 	}
-	t.Collector.WriteSummary(sr)
 }
 
 func (t *Test) End() {
@@ -131,7 +182,7 @@ func (t *Test) Listen() {
 		select {
 		case <-t.InReqs:
 			t.Current()
-		case m := <-t.InMsgs:
+		case m := <-t.InBpsTests:
 			t.AddResult(m)
 		case <-t.Stop:
 			fmt.Printf("Test finished.\n")
@@ -141,5 +192,5 @@ func (t *Test) Listen() {
 }
 
 func (t *Test) AddResult(tr BwTestResult) {
-	t.Queue = append(t.Queue, tr)
+	t.BpsQueue = append(t.BpsQueue, tr)
 }

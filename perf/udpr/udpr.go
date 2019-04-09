@@ -119,6 +119,7 @@ func (c *Client) Run() {
 	switch {
 	case h.PacketType.Value == CONFIRM_TYPE:
 		fmt.Printf("UDP stream confirmed.")
+		test := stats.InitTest()
 		addr, _ := net.ResolveUDPAddr("udp", c.Config.Server)
 
 		// start the state machine
