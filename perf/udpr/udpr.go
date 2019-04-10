@@ -67,6 +67,7 @@ func (s *Server) Run() {
 			test := stats.InitTest()
 			ut.countedRead(test)
 			test.End()
+			test.Summary()
 		}
 	}
 }
@@ -80,7 +81,8 @@ type Client struct {
 }
 
 type ClientConfig struct {
-	Server string
+	Server      string
+	PacketCount uint64
 }
 
 /*
@@ -111,7 +113,7 @@ func (c *Client) Run() {
 
 	conn, err := net.Dial("udp", c.Config.Server)
 	errors.CheckError(err)
-	SendOpen(conn, 500, 100)
+	SendOpen(conn, c.Config.PacketCount, 100)
 	packet := make([]byte, 1500)
 	_, err = conn.Read(packet)
 	errors.CheckError(err)
@@ -124,7 +126,7 @@ func (c *Client) Run() {
 		addr, _ := net.ResolveUDPAddr("udp", c.Config.Server)
 
 		// start the state machine
-		ut := InitUdpSm(conn, addr, 100, 500)
+		ut := InitUdpSm(conn, addr, 100, c.Config.PacketCount)
 		ut.countedSend(test)
 		test.End()
 	}

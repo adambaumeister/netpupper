@@ -1,9 +1,11 @@
 package udpr
 
 import (
+	"context"
 	"fmt"
 	"github.com/adamb/netpupper/errors"
 	"github.com/adamb/netpupper/perf/stats"
+	"golang.org/x/time/rate"
 	"net"
 )
 
@@ -64,18 +66,20 @@ func (u *UdpTransport) countedRead(test *stats.Test) {
 				EffectiveLoss: len(u.EffectiveLost),
 			}
 			test.InRelTests <- r
-			fmt.Printf("Sending stats at %v %v %v\n", u.CurrentSequence, u.window, count)
 			count = 0
 		}
 		count = count + 1
 	}
-	fmt.Printf("finished read. Lost: %v, Eff Lost: %v\n", len(u.Buffer), len(u.EffectiveLost))
 
 }
 
 func (u *UdpTransport) countedSend(test *stats.Test) {
-
+	ctx := context.Background()
+	// 10000 events p/s goal
+	limit := CalcLimiter(1000)
 	for u.CurrentSequence <= u.maxlength {
+		fmt.Printf("Sending seq: %v\n", u.CurrentSequence)
+		limit.Wait(ctx)
 
 		SendDatagram(u.conn, u.CurrentSequence, []byte{1, 1, 1, 1})
 		u.CurrentSequence = u.CurrentSequence + 1
@@ -104,4 +108,11 @@ func (u *UdpTransport) CheckSequence(d Datagram) {
 			i = i + 1
 		}
 	}
+}
+
+func CalcLimiter(cir int) *rate.Limiter {
+	// bc = cir *tc /1000
+	bc := cir * 1 / 1000
+	l := rate.NewLimiter(1000, bc)
+	return l
 }
