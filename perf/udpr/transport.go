@@ -76,7 +76,7 @@ func (u *UdpTransport) countedRead(test *stats.Test) {
 func (u *UdpTransport) countedSend(test *stats.Test) {
 	ctx := context.Background()
 	// 10000 events p/s goal
-	limit := CalcLimiter(1000)
+	limit := CalcLimiter(10000)
 	for u.CurrentSequence <= u.maxlength {
 		fmt.Printf("Sending seq: %v\n", u.CurrentSequence)
 		limit.Wait(ctx)
@@ -112,7 +112,9 @@ func (u *UdpTransport) CheckSequence(d Datagram) {
 
 func CalcLimiter(cir int) *rate.Limiter {
 	// bc = cir *tc /1000
-	bc := cir * 1 / 1000
-	l := rate.NewLimiter(1000, bc)
+	// below chops one second up into 100 time intervals
+	bc := cir * 10 / 1000
+	limit := rate.Limit(cir)
+	l := rate.NewLimiter(limit, bc)
 	return l
 }

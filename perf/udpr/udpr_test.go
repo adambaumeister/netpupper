@@ -14,7 +14,7 @@ func TestClient_Run(t *testing.T) {
 	c := Client{}
 	c.Configure("")
 	c.Config.Server = "127.0.0.1:9500"
-	c.Config.PacketCount = 15000
+	c.Config.PacketCount = 50000
 	c.Run()
 	time.Sleep(1 * time.Second)
 }
