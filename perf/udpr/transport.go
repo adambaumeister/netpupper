@@ -46,12 +46,12 @@ func InitUdpSm(conn net.Conn, addr *net.UDPAddr, ac uint32, ml uint64) UdpTransp
 Will send an ACK every AckCount packets (ac)
 Ends after max length
 */
-func (u *UdpTransport) countedRead(test *stats.Test) {
+func (u *UdpTransport) countedRead(uc *net.UDPConn, test *stats.Test) {
 	packet := make([]byte, 1500)
 	count := uint32(0)
 	// Read all incoming udp packets
 	for u.CurrentSequence < u.maxlength {
-		_, err := u.conn.Read(packet)
+		_, addr, err := uc.ReadFromUDP(packet)
 		errors.CheckError(err)
 
 		h := ReadHeader(packet)
@@ -67,22 +67,37 @@ func (u *UdpTransport) countedRead(test *stats.Test) {
 			}
 			test.InRelTests <- r
 			count = 0
+			SendAck(uc, addr)
+
 		}
 		count = count + 1
 	}
 
 }
 
-func (u *UdpTransport) countedSend(test *stats.Test) {
+func (u *UdpTransport) countedSend(test *stats.Test, ratel int) {
 	ctx := context.Background()
 	// 10000 events p/s goal
-	limit := CalcLimiter(10000)
+	// 10000 events p/s * 1000 bytes/event = 10MBps
+	limit := CalcLimiter(ratel)
+	count := uint32(0)
 	for u.CurrentSequence <= u.maxlength {
-		fmt.Printf("Sending seq: %v\n", u.CurrentSequence)
 		limit.Wait(ctx)
 
 		SendDatagram(u.conn, u.CurrentSequence, []byte{1, 1, 1, 1})
 		u.CurrentSequence = u.CurrentSequence + 1
+		if count == u.window {
+			packet := make([]byte, 1500)
+			_, err := u.conn.Read(packet)
+
+			errors.CheckError(err)
+			h := ReadHeader(packet)
+			if h.PacketType.Value == ACK_TYPE {
+				fmt.Printf("Got an ack\n")
+			}
+			count = 0
+		}
+		count = count + 1
 	}
 }
 

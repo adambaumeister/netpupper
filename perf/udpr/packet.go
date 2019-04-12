@@ -185,6 +185,21 @@ func SendOpen(conn net.Conn, dl uint64, ac uint32) {
 	errors.CheckError(err)
 }
 
+func SendAck(conn *net.UDPConn, a *net.UDPAddr) {
+	p := Header{}
+	pl := IntField{}
+	pl.Write(4)
+
+	p.AddField(&pl)
+	pt := IntField{}
+	pt.Write(ACK_TYPE)
+	p.AddField(&pt)
+
+	b := p.Serialize()
+	_, err := conn.WriteToUDP(b, a)
+	errors.CheckError(err)
+}
+
 func SendConfirm(conn *net.UDPConn, a *net.UDPAddr) {
 	p := Header{}
 	pl := IntField{}

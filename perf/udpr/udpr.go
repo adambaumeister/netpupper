@@ -65,7 +65,7 @@ func (s *Server) Run() {
 			SendConfirm(conn, addr)
 			ut := InitUdpSm(conn, addr, o.AckCount, o.DataLength)
 			test := stats.InitTest()
-			ut.countedRead(test)
+			ut.countedRead(conn, test)
 			test.End()
 			test.Summary()
 		}
@@ -83,6 +83,7 @@ type Client struct {
 type ClientConfig struct {
 	Server      string
 	PacketCount uint64
+	Rate        int
 }
 
 /*
@@ -121,13 +122,13 @@ func (c *Client) Run() {
 	h := ReadHeader(packet)
 	switch {
 	case h.PacketType.Value == CONFIRM_TYPE:
-		fmt.Printf("UDP stream confirmed.")
+		fmt.Printf("UDP stream confirmed.\n")
 		test := stats.InitTest()
 		addr, _ := net.ResolveUDPAddr("udp", c.Config.Server)
 
 		// start the state machine
 		ut := InitUdpSm(conn, addr, 100, c.Config.PacketCount)
-		ut.countedSend(test)
+		ut.countedSend(test, c.Config.Rate)
 		test.End()
 	}
 }
