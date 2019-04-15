@@ -7,6 +7,7 @@ import (
 	"github.com/adamb/netpupper/perf/stats"
 	"golang.org/x/time/rate"
 	"net"
+	"time"
 )
 
 /*
@@ -16,11 +17,11 @@ It is responsible for tracking the latency, jitter, and loss within the test by 
 
 */
 type UdpTransport struct {
-	conn      net.Conn
-	addr      *net.UDPAddr
-	window    uint32
-	maxlength uint64
-
+	conn            net.Conn
+	addr            *net.UDPAddr
+	window          uint32
+	maxlength       uint64
+	timeout         time.Duration
 	CurrentSequence uint64
 	Buffer          []Datagram
 
@@ -39,6 +40,8 @@ func InitUdpSm(conn net.Conn, addr *net.UDPAddr, ac uint32, ml uint64) UdpTransp
 
 		CurrentSequence: 0,
 	}
+	u.timeout = 15 * time.Second
+
 	return u
 }
 
@@ -51,6 +54,7 @@ func (u *UdpTransport) countedRead(uc *net.UDPConn, test *stats.Test) {
 	count := uint32(0)
 	// Read all incoming udp packets
 	for u.CurrentSequence < u.maxlength {
+		u.conn.SetDeadline(time.Now().Local().Add(u.timeout))
 		_, addr, err := uc.ReadFromUDP(packet)
 		errors.CheckError(err)
 
@@ -59,6 +63,7 @@ func (u *UdpTransport) countedRead(uc *net.UDPConn, test *stats.Test) {
 			d := ReadDatagram(packet)
 			u.CheckSequence(d)
 			u.CurrentSequence = d.Sequence
+			//fmt.Printf("Seq: %v\n", u.CurrentSequence)
 		}
 		if count == u.window {
 			r := stats.ReliabilityResult{
@@ -67,6 +72,7 @@ func (u *UdpTransport) countedRead(uc *net.UDPConn, test *stats.Test) {
 			}
 			test.InRelTests <- r
 			count = 0
+
 			SendAck(uc, addr)
 
 		}

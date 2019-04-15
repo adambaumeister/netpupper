@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/adamb/netpupper/api"
 	"github.com/adamb/netpupper/perf/tcpbw"
+	"github.com/adamb/netpupper/perf/udpr"
 )
 
 type Runner interface {
@@ -26,27 +27,41 @@ func ParseArgs() Runner {
 	reverse := flag.Bool("reverse", false, "Reverse data direction.")
 	cfgFile := flag.String("config", "./daemon_server.yml", "YAML Configuration file")
 	daemon := flag.Bool("daemon", false, "Run in DAEMON mode and start the API.")
+	testType := flag.String("test", "TCP", "Run either a TCP Bandwidth test or a UDP reliability test (default: TCP)")
 
 	// CMDLINE Args
 	addr := flag.String("address", ":8080", "Address to bind server daemon OR server address to test against.")
 	bytes := flag.String("bytes", "1G", "Total bytes to send.")
 
 	flag.Parse()
-
 	if *clientMode {
 		fmt.Printf("Started in CLIENT mode\n")
-		c := &tcpbw.Client{}
-		c.Configure(*cfgFile)
-		c.Config.Server = *addr
-		c.Config.Bytes = *bytes
-		c.Config.Reverse = *reverse
-		return c
+		if *testType == "UDP" {
+			c := &udpr.Client{}
+			c.Configure(*cfgFile)
+			c.Config.Server = *addr
+			return c
+		} else {
+			c := &tcpbw.Client{}
+			c.Configure(*cfgFile)
+			c.Config.Server = *addr
+			c.Config.Bytes = *bytes
+			c.Config.Reverse = *reverse
+			return c
+		}
 	} else if *serverMode {
-		s := &tcpbw.Server{}
-		s.Configure(*cfgFile)
-		s.Config.Address = *addr
 		fmt.Printf("Started in SERVER mode\n")
-		return s
+		if *testType == "UDP" {
+			s := &udpr.Server{}
+			s.Configure(*cfgFile)
+			s.Config.Address = *addr
+			return s
+		} else {
+			s := &tcpbw.Server{}
+			s.Configure(*cfgFile)
+			s.Config.Address = *addr
+			return s
+		}
 	} else if *daemon {
 		a := &api.API{}
 		a.Configure(*cfgFile)

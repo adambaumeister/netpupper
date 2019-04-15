@@ -5,14 +5,27 @@ import (
 	"testing"
 )
 
-func _TestStartServerApi(t *testing.T) {
-	go StartServerApi("8999")
+// Test the API server
+// Uses the example daemon* configs, found in the root of this repo
+func TestStartServerApi(t *testing.T) {
+	// Server
 	a := API{}
-	a.SendRegister("127.0.0.1:8999")
-	a.StartbwTest(
+	a.Configure("../daemon_server.yml")
+	go a.Run()
+	// client
+	ca := API{}
+	ca.Configure("../daemon.yml")
+	ca.SendRegister("127.0.0.1:8999")
+	ca.StartbwTest(
 		"127.0.0.1:8999",
-		"127.0.0.1:8080",
-		"500m",
+		"127.0.0.1:5000",
+		"100M",
+	)
+	ca.StartUdpTest(
+		"127.0.0.1:8999",
+		"127.0.0.1:5001",
+		20000,
+		5000,
 	)
 }
 

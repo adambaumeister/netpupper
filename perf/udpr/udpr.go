@@ -13,7 +13,7 @@ import (
 type Server struct {
 	notifyChan chan bool
 	stopChan   chan bool
-	Config     *ServerConfig `yaml:"tcpbw"`
+	Config     *ServerConfig `yaml:"udpr"`
 }
 
 type ServerConfig struct {
@@ -114,7 +114,7 @@ func (c *Client) Run() {
 
 	conn, err := net.Dial("udp", c.Config.Server)
 	errors.CheckError(err)
-	SendOpen(conn, c.Config.PacketCount, 100)
+	SendOpen(conn, c.Config.PacketCount, 1000)
 	packet := make([]byte, 1500)
 	_, err = conn.Read(packet)
 	errors.CheckError(err)
@@ -127,8 +127,12 @@ func (c *Client) Run() {
 		addr, _ := net.ResolveUDPAddr("udp", c.Config.Server)
 
 		// start the state machine
-		ut := InitUdpSm(conn, addr, 100, c.Config.PacketCount)
+		ut := InitUdpSm(conn, addr, 1000, c.Config.PacketCount)
 		ut.countedSend(test, c.Config.Rate)
 		test.End()
 	}
+}
+
+func (c *Client) SetTestCollector(sc stats.Collector) {
+	c.testCollector = sc
 }

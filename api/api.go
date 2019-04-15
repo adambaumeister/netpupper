@@ -7,6 +7,7 @@ import (
 	"github.com/adamb/netpupper/controller"
 	"github.com/adamb/netpupper/errors"
 	"github.com/adamb/netpupper/perf/tcpbw"
+	"github.com/adamb/netpupper/perf/udpr"
 	"gopkg.in/yaml.v2"
 	"io/ioutil"
 	"log"
@@ -79,6 +80,11 @@ func (a *API) Run() {
 	s.Configure(a.configFile)
 	fmt.Printf("Start TCPBW port: %v\n", s.Config.Address)
 	go s.Run()
+	// UDP SERVER
+	us := udpr.Server{}
+	us.Configure(a.configFile)
+	fmt.Printf("Start UDPR port: %v\n", us.Config.Address)
+	go us.Run()
 	fmt.Printf("Started API server on %v\n", a.Config.ApiPort)
 	StartServerApi(a.Config.ApiPort)
 }
@@ -91,6 +97,7 @@ func StartServerApi(p string) API {
 
 	http.HandleFunc("/register", a.register)
 	http.HandleFunc("/tcpbw", a.bwtest)
+	http.HandleFunc("/udpr", a.udptest)
 	http.HandleFunc("/clients", a.getclients)
 	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%v", p), nil))
 
@@ -114,6 +121,35 @@ func (a *API) register(w http.ResponseWriter, r *http.Request) {
 	errors.CheckError(err)
 	w.Write(b)
 
+}
+
+/*
+Start a UDP reliability test from the given client
+*/
+func (a *API) udptest(w http.ResponseWriter, r *http.Request) {
+	var cc udpr.ClientConfig
+	body, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		panic(err)
+	}
+	err = json.Unmarshal(body, &cc)
+
+	// Setup an API test collector. Stats will be sent back to the client.
+	ac := ApiCollector{}
+	enableCors(&w)
+
+	// Required for CORS to work.
+	if r.Method == "OPTIONS" {
+		return
+	}
+	fmt.Printf("DEBUG: Got a UDP test request destination: %v\n", cc.Server)
+	ac.SetResponse(w)
+
+	c := udpr.Client{
+		Config: &cc,
+	}
+	c.SetTestCollector(&ac)
+	c.Run()
 }
 
 func (a *API) bwtest(w http.ResponseWriter, r *http.Request) {
@@ -165,7 +201,25 @@ func (a *API) StartbwTest(addr string, server string, byteCount string) {
 	msg := Message{}
 	body, _ := ioutil.ReadAll(resp.Body)
 	json.Unmarshal(body, &msg)
-	fmt.Printf("DEBUG: %v\n", msg.Value)
+}
+
+/*
+Start a UDP Reliability test from a client
+*/
+func (a *API) StartUdpTest(addr string, server string, pc uint64, rate int) {
+	cc := udpr.ClientConfig{
+		Server:      server,
+		PacketCount: pc,
+		Rate:        rate,
+	}
+	b, err := json.Marshal(cc)
+	errors.CheckError(err)
+	resp, err := http.Post(fmt.Sprintf("http://%v/udpr", addr), "application/json", bytes.NewBuffer(b))
+	errors.CheckError(err)
+
+	msg := Message{}
+	body, _ := ioutil.ReadAll(resp.Body)
+	json.Unmarshal(body, &msg)
 }
 
 /*
