@@ -69,14 +69,16 @@ func (u *UdpTransport) countedRead(uc *net.UDPConn, test *stats.Test) {
 			//fmt.Printf("Seq: %v\n", u.CurrentSequence)
 		}
 		if count == u.window {
+			loss := len(u.Buffer)
+			ef := len(u.EffectiveLost)
 			r := stats.ReliabilityResult{
-				Loss:          len(u.Buffer),
-				EffectiveLoss: len(u.EffectiveLost),
+				Loss:          loss,
+				EffectiveLoss: ef,
 			}
 			test.InRelTests <- r
 			count = 0
 
-			SendAck(uc, addr)
+			SendAck(uc, addr, uint32(loss), uint32(ef))
 
 		}
 		count = count + 1
@@ -102,7 +104,13 @@ func (u *UdpTransport) countedSend(test *stats.Test, ratel int) {
 			errors.CheckError(err)
 			h := ReadHeader(packet)
 			if h.PacketType.Value == ACK_TYPE {
-				fmt.Printf("Got an ack\n")
+				ack := ReadAck(packet)
+				fmt.Printf("Got an ack. Loss: %v\n", ack.Loss)
+				r := stats.ReliabilityResult{
+					Loss:          int(ack.Loss),
+					EffectiveLoss: int(ack.EffectiveLoss),
+				}
+				test.InRelTests <- r
 			}
 			count = 0
 		}

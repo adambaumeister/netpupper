@@ -85,6 +85,28 @@ func (m *Datagram) Write(b []byte, sn uint64) {
 }
 
 /*
+ UDP Acknowlegement
+Used to signal the client to keep sending.
+Also carries statistical information from the server so the client can report it.
+*/
+type Ack struct {
+	Loss          uint32
+	EffectiveLoss uint32
+}
+
+func (a *Ack) Write(loss uint32, ef uint32) {
+	a.EffectiveLoss = ef
+	a.Loss = loss
+}
+
+func (a *Ack) Serialize() []byte {
+	b := make([]byte, 8)
+	binary.BigEndian.PutUint32(b[:4], a.Loss)
+	binary.BigEndian.PutUint32(b[4:8], a.EffectiveLoss)
+	return b
+}
+
+/*
 Header is the packet header - it defines what type of packet it is and how long it is.
 */
 type Header struct {
@@ -130,6 +152,13 @@ func ReadOpen(b []byte) Open {
 	o.DataLength = binary.BigEndian.Uint64(b[HEADER_LENGTH:12])
 	o.AckCount = binary.BigEndian.Uint32(b[12:16])
 	return o
+}
+
+func ReadAck(b []byte) Ack {
+	a := Ack{}
+	a.Loss = binary.BigEndian.Uint32(b[HEADER_LENGTH:8])
+	a.EffectiveLoss = binary.BigEndian.Uint32(b[8:12])
+	return a
 }
 
 func ReadDatagram(b []byte) Datagram {
@@ -185,16 +214,22 @@ func SendOpen(conn net.Conn, dl uint64, ac uint32) {
 	errors.CheckError(err)
 }
 
-func SendAck(conn *net.UDPConn, a *net.UDPAddr) {
-	p := Header{}
+func SendAck(conn *net.UDPConn, a *net.UDPAddr, loss uint32, ef uint32) {
+	h := Header{}
 	pl := IntField{}
 	pl.Write(4)
 
-	p.AddField(&pl)
+	h.AddField(&pl)
 	pt := IntField{}
 	pt.Write(ACK_TYPE)
-	p.AddField(&pt)
+	h.AddField(&pt)
 
+	p := Packet{}
+	p.Header = &h
+	msg := Ack{}
+	msg.Write(loss, ef)
+
+	p.Message = &msg
 	b := p.Serialize()
 	_, err := conn.WriteToUDP(b, a)
 	errors.CheckError(err)
