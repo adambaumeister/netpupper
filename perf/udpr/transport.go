@@ -40,7 +40,7 @@ func InitUdpSm(conn net.Conn, addr *net.UDPAddr, ac uint32, ml uint64) UdpTransp
 
 		CurrentSequence: 0,
 	}
-	u.timeout = 15 * time.Second
+	u.timeout = 3 * time.Second
 
 	return u
 }
@@ -56,7 +56,10 @@ func (u *UdpTransport) countedRead(uc *net.UDPConn, test *stats.Test) {
 	for u.CurrentSequence < u.maxlength {
 		u.conn.SetDeadline(time.Now().Local().Add(u.timeout))
 		_, addr, err := uc.ReadFromUDP(packet)
-		errors.CheckError(err)
+		if err != nil {
+			fmt.Printf("Failed read: %v, %v\n", u.CurrentSequence, u.maxlength)
+		}
+		//errors.CheckError(err)
 
 		h := ReadHeader(packet)
 		if h.PacketType.Value == DG_TYPE {

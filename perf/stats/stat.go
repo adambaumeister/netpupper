@@ -153,6 +153,7 @@ func (t *Test) Summary() {
 	}
 
 	if len(t.ReliabilityQueue) > 0 {
+		fmt.Printf("Writing rel summary...\n")
 		totalLoss := 0
 		totalef := 0
 

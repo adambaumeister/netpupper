@@ -34,7 +34,7 @@ type ServerConfig struct {
 Configure the TCPBW Server
 Returns TRUE if this method matches the requested config
 */
-func (s *Server) Configure(cf string) {
+func (s *Server) Configure(cf string) bool {
 	var serverFile string
 	if len(cf) > 0 {
 		serverFile = cf
@@ -49,9 +49,12 @@ func (s *Server) Configure(cf string) {
 		errors.CheckError(err)
 
 		err = yaml.Unmarshal(data, s)
-		fmt.Printf("yep got here: %v\n", s.Config.Address)
 		errors.CheckError(err)
+		if s.Config.Address != "" {
+			return true
+		}
 	}
+	return false
 }
 
 func (s *Server) Run() {
@@ -168,7 +171,7 @@ type ClientConfig struct {
 Configure the TCPBW Client
 Configuration can set external to this function, however, should be done after this call.
 */
-func (c *Client) Configure(cf string) {
+func (c *Client) Configure(cf string) bool {
 	var f string
 	if len(cf) > 0 {
 		f = cf
@@ -184,7 +187,9 @@ func (c *Client) Configure(cf string) {
 
 		err = yaml.Unmarshal(data, c.Config)
 		errors.CheckError(err)
+		return true
 	}
+	return false
 }
 
 /*

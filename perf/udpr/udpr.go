@@ -24,7 +24,7 @@ type ServerConfig struct {
 Configure the UDP Reliability test
 Returns TRUE if this method matches the requested config
 */
-func (s *Server) Configure(cf string) {
+func (s *Server) Configure(cf string) bool {
 	var serverFile string
 	if len(cf) > 0 {
 		serverFile = cf
@@ -40,7 +40,11 @@ func (s *Server) Configure(cf string) {
 
 		err = yaml.Unmarshal(data, s)
 		errors.CheckError(err)
+		if s.Config.Address != "" {
+			return true
+		}
 	}
+	return false
 }
 
 func (s *Server) Run() {
@@ -49,9 +53,10 @@ func (s *Server) Run() {
 	s.notifyChan = make(chan bool)
 
 	addr, err := net.ResolveUDPAddr("udp", s.Config.Address)
-	conn, err := net.ListenUDP("udp", addr)
 	errors.CheckError(err)
 	for {
+		conn, err := net.ListenUDP("udp", addr)
+		fmt.Printf("Waiting for UDP client.\n")
 		packet := make([]byte, 1500)
 		_, addr, err := conn.ReadFromUDP(packet)
 
@@ -67,7 +72,7 @@ func (s *Server) Run() {
 			test := stats.InitTest()
 			ut.countedRead(conn, test)
 			test.End()
-			test.Summary()
+			conn.Close()
 		}
 	}
 }
@@ -89,7 +94,7 @@ type ClientConfig struct {
 /*
 Configure the UDPR Client
 */
-func (c *Client) Configure(cf string) {
+func (c *Client) Configure(cf string) bool {
 	var f string
 	if len(cf) > 0 {
 		f = cf
@@ -105,7 +110,9 @@ func (c *Client) Configure(cf string) {
 
 		err = yaml.Unmarshal(data, c.Config)
 		errors.CheckError(err)
+		return true
 	}
+	return false
 }
 
 func (c *Client) Run() {
@@ -130,6 +137,7 @@ func (c *Client) Run() {
 		ut := InitUdpSm(conn, addr, 1000, c.Config.PacketCount)
 		ut.countedSend(test, c.Config.Rate)
 		test.End()
+		test.Summary()
 	}
 }
 

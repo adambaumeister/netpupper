@@ -41,7 +41,7 @@ func enableCors(w *http.ResponseWriter) {
 Configure the API
 Returns TRUE if this method matches the requested config
 */
-func (a *API) Configure(cf string) {
+func (a *API) Configure(cf string) bool {
 
 	a.configFile = cf
 	var serverFile string
@@ -63,7 +63,10 @@ func (a *API) Configure(cf string) {
 
 		err = yaml.Unmarshal(data, a.Config)
 		errors.CheckError(err)
+		return true
+
 	}
+	return false
 }
 
 /*
@@ -76,15 +79,22 @@ func (a *API) Run() {
 	}
 	// Start the test listeners
 	// TCP BANDWIDTH SERVER
+	var result bool
 	s := tcpbw.Server{}
-	s.Configure(a.configFile)
-	fmt.Printf("Start TCPBW port: %v\n", s.Config.Address)
-	go s.Run()
+	result = s.Configure(a.configFile)
+	if result {
+		fmt.Printf("Start TCPBW port: %v\n", s.Config.Address)
+		go s.Run()
+	}
+
 	// UDP SERVER
 	us := udpr.Server{}
-	us.Configure(a.configFile)
-	fmt.Printf("Start UDPR port: %v\n", us.Config.Address)
-	go us.Run()
+	result = us.Configure(a.configFile)
+	if result {
+		fmt.Printf("Start UDPR port: %v\n", us.Config.Address)
+		go us.Run()
+	}
+
 	fmt.Printf("Started API server on %v\n", a.Config.ApiPort)
 	StartServerApi(a.Config.ApiPort)
 }

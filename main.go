@@ -9,7 +9,7 @@ import (
 )
 
 type Runner interface {
-	Configure(string)
+	Configure(string) bool
 	Run()
 }
 
@@ -40,6 +40,8 @@ func ParseArgs() Runner {
 			c := &udpr.Client{}
 			c.Configure(*cfgFile)
 			c.Config.Server = *addr
+			c.Config.Rate = 5000
+			c.Config.PacketCount = uint64(20000)
 			return c
 		} else {
 			c := &tcpbw.Client{}
