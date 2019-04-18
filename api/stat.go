@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"fmt"
 	"github.com/adamb/netpupper/errors"
 	"github.com/adamb/netpupper/perf/stats"
 	"net/http"
@@ -29,6 +30,7 @@ func (a *ApiCollector) WriteReliabilityTest(r stats.ReliabilityResult) {
 	// Currently does nothing - we don't send periodic updates
 }
 func (a *ApiCollector) WriteReliabilitySummary(r stats.ReliabilitySummaryResult) {
+	fmt.Printf("writing: %v %v\n", r.Loss, r.EffectiveLoss)
 	b, err := json.Marshal(r)
 	errors.CheckError(err)
 	a.rw.Write(b)

@@ -130,7 +130,11 @@ func (c *Client) Run() {
 	switch {
 	case h.PacketType.Value == CONFIRM_TYPE:
 		fmt.Printf("UDP stream confirmed.\n")
+		// Problem is here - test collector is reinitlized
 		test := stats.InitTest()
+		if c.testCollector != nil {
+			test.Collector = c.testCollector
+		}
 		addr, _ := net.ResolveUDPAddr("udp", c.Config.Server)
 
 		// start the state machine
