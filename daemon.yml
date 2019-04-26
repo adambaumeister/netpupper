@@ -1,6 +1,6 @@
 servers:
-  #- 127.0.0.1:8999
-  - rpi.home:8999
+  - 127.0.0.1:8999
+  #- rpi.home:8999
 tcpbw:
   address: :4999
 apiport: 8998

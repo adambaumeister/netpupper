@@ -24,6 +24,8 @@ type Server struct {
 	notifyChan chan bool
 	stopChan   chan bool
 	Config     *ServerConfig `yaml:"tcpbw"`
+
+	Influx *stats.Influx
 }
 
 type ServerConfig struct {
