@@ -24,8 +24,9 @@ type Server struct {
 	notifyChan chan bool
 	stopChan   chan bool
 	Config     *ServerConfig `yaml:"tcpbw"`
+	Influx     *stats.Influx `yaml:"influx"`
 
-	Influx *stats.Influx
+	testCollector stats.Collector
 }
 
 type ServerConfig struct {
@@ -52,6 +53,12 @@ func (s *Server) Configure(cf string) bool {
 
 		err = yaml.Unmarshal(data, s)
 		errors.CheckError(err)
+
+		if s.Influx.Database != "" {
+			fmt.Printf("Using INFLUXDB as stats collector.\n")
+			s.testCollector = s.Influx
+		}
+
 		if s.Config.Address != "" {
 			return true
 		}
@@ -92,6 +99,9 @@ func (s *Server) ClientToServer(conn net.Conn, o *Open) {
 
 	// Initilize a test for storing the results
 	test := stats.InitTest()
+	if s.testCollector != nil {
+		test.Collector = s.testCollector
+	}
 	timedRead(conn, o.DataLength, test.InBpsTests, s.stopChan)
 	// Schedule the test interval function
 	//GetUserInput(test.InReqs, s.stopChan)
