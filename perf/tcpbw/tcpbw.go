@@ -20,7 +20,7 @@ Main struct for tcp bandwidth server
 	notifyChan: bool channel, notifies the server to do "something", depending on the context
 	stopChan: Bool channel, notifies the receiving function to stop.
 	Config: Configuration for this server
-	Influx: If available, use Influx as the output for stats instead of stdout.
+	Influx: If available, use an Influx database as the output for stats instead of stdout.
 */
 type Server struct {
 	notifyChan chan bool
@@ -174,6 +174,7 @@ type Client struct {
 
 	Config *ClientConfig `yaml:"tcpbw"`
 	Influx *stats.Influx `yaml:"influx"`
+	Tags   map[string]string
 }
 
 type ClientConfig struct {
@@ -205,6 +206,9 @@ func (c *Client) Configure(cf string) bool {
 
 		if c.Influx != nil {
 			fmt.Printf("Using INFLUXDB as stats collector.\n")
+			host, _ := os.Hostname()
+			c.Tags["name"] = host
+			c.Influx.Tags = c.Tags
 			c.testCollector = c.Influx
 		}
 

@@ -11,7 +11,7 @@ type Influx struct {
 	Database   string
 
 	Points []*client.Point
-	Tags   []map[string]string
+	Tags   map[string]string
 }
 
 type Config struct {
@@ -25,9 +25,7 @@ func (w *Influx) WriteBwTest(r BpsResult) {
 	f := map[string]interface{}{
 		"BPS": r.Bps,
 	}
-	t := map[string]string{
-		"testtag": "spaghett",
-	}
+	t := w.Tags
 	point, err := client.NewPoint(
 		"bps",
 		t,
