@@ -2,12 +2,7 @@ package controller
 
 type Client struct {
 	Addr string
-	Tags []Tag
-}
-
-type Tag struct {
-	Name  string
-	Value string
+	Tags map[string]string
 }
 
 type Controller struct {
@@ -20,5 +15,4 @@ func (c *Controller) AddClient(client Client) {
 
 func (c *Controller) GetFirstClient() Client {
 	return c.Clients[0]
-
 }

@@ -27,7 +27,7 @@ type API struct {
 type APIConfig struct {
 	Servers []string
 	ApiPort string
-	Tags    []controller.Tag
+	Tags    map[string]string
 }
 
 func enableCors(w *http.ResponseWriter) {
@@ -237,11 +237,8 @@ Send a register
 */
 func (a *API) SendRegister(server string) {
 	host, _ := os.Hostname()
-	gt := controller.Tag{
-		Name:  "name",
-		Value: host,
-	}
-	tags := append(a.Config.Tags, gt)
+	tags := a.Config.Tags
+	tags["name"] = host
 	reg := controller.Client{
 		Tags: tags,
 	}

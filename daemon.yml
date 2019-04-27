@@ -3,9 +3,13 @@ servers:
   #- rpi.home:8999
 tcpbw:
   address: :4999
+influx:
+  httpconfig:
+    addr: "http://192.168.1.18:8086"
+    username: "test"
+    password: "test"
+  database: "netpupper"
 apiport: 8998
 tags:
-  - name: lat
-    value: -35.351023
-  - name: lon
-    value: 149.064355
+  lat: -35.351023
+  lon: 149.064355
