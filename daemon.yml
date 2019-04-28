@@ -9,7 +9,7 @@ influx:
     username: "test"
     password: "test"
   database: "netpupper"
-apiport: 8998
+apiaddr: ":8998"
 tags:
   lat: -35.351023
   lon: 149.064355

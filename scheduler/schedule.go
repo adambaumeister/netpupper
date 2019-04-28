@@ -48,9 +48,9 @@ type TestSchedule struct {
 }
 
 // Init the schedule and build the slot layout
-func InitSchedule(cf string) TestSchedule {
+func InitSchedule() *TestSchedule {
 	ts := TestSchedule{}
-	return ts
+	return &ts
 }
 
 // Run all tests at this current tick
@@ -58,12 +58,14 @@ func InitSchedule(cf string) TestSchedule {
 func (t *TestSchedule) RunTests(ti int64) {
 	for _, si := range t.Tests {
 		if si.Time <= int(ti) {
-			si.test.Run()
+			si.test()
 			// Update the schedule and lastrun
-			si.Time = si.Time + t.Interval
-			si.lastRun = si.Time
+			fmt.Printf("Time %v interval %v New time %v\n", ti, t.Interval, si.Time+t.Interval)
+			si.UpdateTime(si.Time + t.Interval)
+			si.UpdateLastRun(si.Time)
 		}
 	}
+	t.PrintSchedule()
 }
 
 // Add a test to the schedule
@@ -82,7 +84,7 @@ if true, schedule for that time.
 
 */
 
-func (t *TestSchedule) ScheduleTest(td TestDefinition) {
+func (t *TestSchedule) ScheduleTest(td func()) {
 	// Get the current second of the day
 	currentSec := int(time.Now().Unix())
 	// If there are no other tests scheduled for just now,
@@ -129,18 +131,20 @@ func (t *TestSchedule) PrintSchedule() {
 
 /*
 ScheduleItem represents a single test run and the time at which it's scheduled
+test is a func pointer that will be run directly.
 */
 type ScheduleItem struct {
 	Name string
 	Time int
 
 	lastRun int
-	test    TestDefinition
+	test    func()
 }
 
-/*
-Test definition is the actual test to run.
-*/
-type TestDefinition interface {
-	Run()
+func (s *ScheduleItem) UpdateTime(t int) {
+	s.Time = t
+}
+
+func (s *ScheduleItem) UpdateLastRun(t int) {
+	s.lastRun = t
 }

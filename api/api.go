@@ -8,6 +8,7 @@ import (
 	"github.com/adamb/netpupper/errors"
 	"github.com/adamb/netpupper/perf/tcpbw"
 	"github.com/adamb/netpupper/perf/udpr"
+	"github.com/adamb/netpupper/scheduler"
 	"gopkg.in/yaml.v2"
 	"io/ioutil"
 	"log"
@@ -22,11 +23,13 @@ type API struct {
 	Config     *APIConfig
 	configFile string
 
+	Schedule *scheduler.TestSchedule
+
 	rw http.ResponseWriter
 }
 type APIConfig struct {
 	Servers []string
-	ApiPort string
+	ApiAddr string
 	Tags    map[string]string
 }
 
@@ -54,7 +57,7 @@ func (a *API) Configure(cf string) bool {
 	// First, try bootstrapping from the YAML server file
 	// Defaults below
 	a.Config = &APIConfig{
-		ApiPort: "8999",
+		ApiAddr: ":8999",
 	}
 	// If the yaml file exists
 	if _, err := os.Stat(serverFile); err == nil {
@@ -63,6 +66,14 @@ func (a *API) Configure(cf string) bool {
 
 		err = yaml.Unmarshal(data, a.Config)
 		errors.CheckError(err)
+
+		// Initialize the scheduler
+		sch := scheduler.TestSchedule{
+			Interval: 60,
+			Buffer:   5,
+		}
+		a.Schedule = &sch
+
 		return true
 
 	}
@@ -95,23 +106,22 @@ func (a *API) Run() {
 		go us.Run()
 	}
 
-	fmt.Printf("Started API server on %v\n", a.Config.ApiPort)
-	StartServerApi(a.Config.ApiPort)
+	fmt.Printf("Started API server on %v\n", a.Config.ApiAddr)
+
+	// This is the problem, the configuration is not replicated to the next object
+	a.StartServerApi(a.Config.ApiAddr)
 }
 
-func StartServerApi(p string) API {
+func (a *API) StartServerApi(p string) {
 	con := controller.Controller{}
-	a := API{
-		Controller: &con,
-	}
+	a.Controller = &con
 
 	http.HandleFunc("/register", a.register)
 	http.HandleFunc("/tcpbw", a.bwtest)
 	http.HandleFunc("/udpr", a.udptest)
 	http.HandleFunc("/clients", a.getclients)
-	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%v", p), nil))
+	log.Fatal(http.ListenAndServe(fmt.Sprintf("%v", p), nil))
 
-	return a
 }
 
 /*
@@ -123,6 +133,18 @@ func (a *API) register(w http.ResponseWriter, r *http.Request) {
 	json.Unmarshal(body, &reg)
 	reg.Addr = strings.Split(r.RemoteAddr, ":")[0]
 	a.Controller.AddClient(reg)
+
+	// for testing
+	reg.ApiAddr = fmt.Sprintf("%v:8998", reg.Addr)
+	reg.Server = "127.0.0.1:5000"
+	reg.ByteCount = "1G"
+
+	fmt.Printf("DEBUG: %v\n", a.Schedule.Interval)
+	//a.Schedule.ScheduleTest(reg.StartbwTest)
+	a.Schedule.ScheduleTest(func() {})
+	a.Schedule.PrintSchedule()
+
+	go a.Schedule.Ticker()
 
 	m := Message{
 		Value: fmt.Sprintf("%v registered to controller.", reg.Addr),
@@ -193,24 +215,6 @@ func (a *API) getclients(w http.ResponseWriter, r *http.Request) {
 	b, err := json.Marshal(a.Controller.Clients)
 	errors.CheckError(err)
 	w.Write(b)
-}
-
-/*
-Start a bandwidth test from a client
-*/
-func (a *API) StartbwTest(addr string, server string, byteCount string) {
-	cc := tcpbw.ClientConfig{
-		Server: server,
-		Bytes:  byteCount,
-	}
-	b, err := json.Marshal(cc)
-	errors.CheckError(err)
-	resp, err := http.Post(fmt.Sprintf("http://%v/tcpbw", addr), "application/json", bytes.NewBuffer(b))
-	errors.CheckError(err)
-
-	msg := Message{}
-	body, _ := ioutil.ReadAll(resp.Body)
-	json.Unmarshal(body, &msg)
 }
 
 /*

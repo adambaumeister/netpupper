@@ -15,12 +15,12 @@ func (d dummyTD) Run() {
 }
 func TestTestSchedule_ScheduleTest(t *testing.T) {
 	td := dummyTD{}
-	ts := InitSchedule("none")
+	ts := InitSchedule()
 	ts.Interval = 30
 	ts.Buffer = 5
-	ts.ScheduleTest(td)
+	ts.ScheduleTest(td.Run)
 	time.Sleep(1 * time.Second)
-	ts.ScheduleTest(td)
+	ts.ScheduleTest(td.Run)
 
 	ts.PrintSchedule()
 	go ts.Ticker()
