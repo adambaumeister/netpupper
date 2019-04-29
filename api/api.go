@@ -20,7 +20,9 @@ import (
 type API struct {
 	Controller *controller.Controller
 
-	Config     *APIConfig
+	Config    *APIConfig
+	TcpBwAddr string
+
 	configFile string
 
 	Schedule *scheduler.TestSchedule
@@ -98,6 +100,7 @@ func (a *API) Run() {
 		go s.Run()
 	}
 
+	a.TcpBwAddr = s.Config.Address
 	// UDP SERVER
 	us := udpr.Server{}
 	result = us.Configure(a.configFile)
@@ -107,8 +110,6 @@ func (a *API) Run() {
 	}
 
 	fmt.Printf("Started API server on %v\n", a.Config.ApiAddr)
-
-	// This is the problem, the configuration is not replicated to the next object
 	a.StartServerApi(a.Config.ApiAddr)
 }
 
@@ -134,12 +135,20 @@ func (a *API) register(w http.ResponseWriter, r *http.Request) {
 	reg.Addr = strings.Split(r.RemoteAddr, ":")[0]
 	a.Controller.AddClient(reg)
 
-	// for testing
-	reg.ApiAddr = fmt.Sprintf("%v:8998", reg.Addr)
-	reg.Server = "127.0.0.1:5000"
+	// ApiAddr will usually be a port number spec only, so this is buggy
+	reg.ApiAddr = fmt.Sprintf("%v%v", reg.Addr, reg.ApiAddr)
+
+	// If the tcpbwaddr string is an fqdn or IP:port combo use it directly
+	// Otherwise get the hostname for this server and set it as that
+	if len(strings.Split(a.TcpBwAddr, ":")) < 3 {
+		host, _ := os.Hostname()
+		reg.Server = fmt.Sprintf("%v%v", host, a.TcpBwAddr)
+	} else {
+		reg.Server = a.TcpBwAddr
+	}
 	reg.ByteCount = "1G"
 
-	fmt.Printf("DEBUG: %v\n", a.Schedule.Interval)
+	fmt.Printf("DEBUG: %v\n", reg.Server)
 	//a.Schedule.ScheduleTest(reg.StartbwTest)
 	a.Schedule.ScheduleTest(func() {})
 	a.Schedule.PrintSchedule()
@@ -244,7 +253,8 @@ func (a *API) SendRegister(server string) {
 	tags := a.Config.Tags
 	tags["name"] = host
 	reg := controller.Client{
-		Tags: tags,
+		ApiAddr: a.Config.ApiAddr,
+		Tags:    tags,
 	}
 	b, err := json.Marshal(reg)
 	errors.CheckError(err)
