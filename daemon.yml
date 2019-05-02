@@ -1,6 +1,6 @@
 servers:
-  - 127.0.0.1:8999
-  #- rpi.home:8999
+  #- 127.0.0.1:8999
+  - rpi.home:8999
 tcpbw:
   address: :4999
 influx:
@@ -9,7 +9,7 @@ influx:
     username: "test"
     password: "test"
   database: "netpupper"
-apiaddr: ":8998"
+apiaddr: ":8999"
 tags:
   lat: -35.351023
   lon: 149.064355

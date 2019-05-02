@@ -140,17 +140,16 @@ func (a *API) register(w http.ResponseWriter, r *http.Request) {
 
 	// If the tcpbwaddr string is an fqdn or IP:port combo use it directly
 	// Otherwise get the hostname for this server and set it as that
-	if len(strings.Split(a.TcpBwAddr, ":")) < 3 {
+	if len(strings.Split(a.TcpBwAddr, ":")) < 2 {
 		host, _ := os.Hostname()
 		reg.Server = fmt.Sprintf("%v%v", host, a.TcpBwAddr)
 	} else {
 		reg.Server = a.TcpBwAddr
 	}
-	reg.ByteCount = "1G"
+	reg.ByteCount = "150M"
 
-	fmt.Printf("DEBUG: %v\n", reg.Server)
-	//a.Schedule.ScheduleTest(reg.StartbwTest)
-	a.Schedule.ScheduleTest(func() {})
+	a.Schedule.ScheduleTest(reg.StartbwTest)
+	//a.Schedule.ScheduleTest(func() {})
 	a.Schedule.PrintSchedule()
 
 	go a.Schedule.Ticker()
@@ -202,20 +201,20 @@ func (a *API) bwtest(w http.ResponseWriter, r *http.Request) {
 	err = json.Unmarshal(body, &cc)
 
 	// Setup an API test collector. Stats will be sent back to the client.
-	ac := ApiCollector{}
-	enableCors(&w)
+	//ac := ApiCollector{}
+	//enableCors(&w)
 
 	// Required for CORS to work.
 	if r.Method == "OPTIONS" {
 		return
 	}
 	fmt.Printf("DEBUG: Got a test request destination: %v\n", cc.Server)
-	ac.SetResponse(w)
 
-	c := tcpbw.Client{
-		Config: &cc,
-	}
-	c.SetTestCollector(&ac)
+	c := tcpbw.Client{}
+	c.Configure(a.configFile)
+	c.Config = &cc
+	//c.SetTestCollector(&ac)
+
 	c.Run()
 }
 
