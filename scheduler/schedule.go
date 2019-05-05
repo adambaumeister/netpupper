@@ -116,7 +116,7 @@ In a way this means tests
 */
 func (t *TestSchedule) TestConflicts(secs int) bool {
 	for _, si := range t.Tests {
-		if secs > si.Time && secs <= si.Time+t.Buffer {
+		if secs >= si.Time && secs < si.Time+t.Buffer {
 			return false
 		}
 	}

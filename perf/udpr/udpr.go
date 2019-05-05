@@ -14,6 +14,9 @@ type Server struct {
 	notifyChan chan bool
 	stopChan   chan bool
 	Config     *ServerConfig `yaml:"udpr"`
+	Influx     *stats.Influx `yaml:"influx"`
+
+	testCollector stats.Collector
 }
 
 type ServerConfig struct {
@@ -40,6 +43,7 @@ func (s *Server) Configure(cf string) bool {
 
 		err = yaml.Unmarshal(data, s)
 		errors.CheckError(err)
+
 		if s.Config.Address != "" {
 			return true
 		}
@@ -82,7 +86,9 @@ type Client struct {
 	stopChan      chan bool
 	testCollector stats.Collector
 
-	Config *ClientConfig
+	Config *ClientConfig `yaml:"udpr"`
+	Influx *stats.Influx `yaml:"influx"`
+	Tags   map[string]string
 }
 
 type ClientConfig struct {
@@ -105,11 +111,21 @@ func (c *Client) Configure(cf string) bool {
 	c.Config = &ClientConfig{}
 	// If the yaml file exists
 	if _, err := os.Stat(cf); err == nil {
+		fmt.Printf("Yep got here..\n")
 		data, err := ioutil.ReadFile(f)
 		errors.CheckError(err)
 
-		err = yaml.Unmarshal(data, c.Config)
+		err = yaml.Unmarshal(data, c)
 		errors.CheckError(err)
+
+		if c.Influx != nil {
+
+			host, _ := os.Hostname()
+			c.Tags["name"] = host
+			c.Influx.Tags = c.Tags
+			c.testCollector = c.Influx
+		}
+
 		return true
 	}
 	return false
@@ -133,6 +149,7 @@ func (c *Client) Run() {
 		// Problem is here - test collector is reinitlized
 		test := stats.InitTest()
 		if c.testCollector != nil {
+			fmt.Printf("Using INFLUXDB as stats collector for UDP...%v\n", c.Influx.Database)
 			test.Collector = c.testCollector
 		}
 		addr, _ := net.ResolveUDPAddr("udp", c.Config.Server)

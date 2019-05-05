@@ -19,11 +19,10 @@ func TestTestSchedule_ScheduleTest(t *testing.T) {
 	ts.Interval = 30
 	ts.Buffer = 5
 	ts.ScheduleTest(td.Run)
-	time.Sleep(1 * time.Second)
 	ts.ScheduleTest(td.Run)
 
 	ts.PrintSchedule()
-	go ts.Ticker()
-	time.Sleep(10 * time.Second)
+	//go ts.Ticker()
+	//time.Sleep(10 * time.Second)
 
 }

@@ -36,6 +36,29 @@ func (w *Influx) WriteBwTest(r BpsResult) {
 }
 
 func (w *Influx) WriteBwSummary(r BpsSummaryResult) {
+	w.WritePoints()
+}
+
+func (w *Influx) WriteReliabilityTest(r ReliabilityResult) {
+	f := map[string]interface{}{
+		"Loss":          r.Loss,
+		"EffectiveLoss": r.EffectiveLoss,
+	}
+	t := w.Tags
+	point, err := client.NewPoint(
+		"reliability",
+		t,
+		f,
+	)
+	errors.CheckError(err)
+	w.Points = append(w.Points, point)
+}
+func (w *Influx) WriteReliabilitySummary(r ReliabilitySummaryResult) {
+	w.WritePoints()
+}
+
+func (w *Influx) WritePoints() {
+	fmt.Printf("Writing to influx.\n")
 	c, err := client.NewHTTPClient(w.HTTPConfig)
 	errors.CheckError(err)
 	bp, err := client.NewBatchPoints(client.BatchPointsConfig{
@@ -48,11 +71,4 @@ func (w *Influx) WriteBwSummary(r BpsSummaryResult) {
 	}
 	err = c.Write(bp)
 	errors.CheckError(err)
-}
-
-func (w *Influx) WriteReliabilityTest(r ReliabilityResult) {
-	fmt.Printf("Loss: %v, effective loss: %v\n", r.Loss, r.EffectiveLoss)
-}
-func (w *Influx) WriteReliabilitySummary(r ReliabilitySummaryResult) {
-	fmt.Printf("Loss: %v, effective loss: %v\n", r.Loss, r.EffectiveLoss)
 }

@@ -2,4 +2,8 @@ tcpbw:
   address: :5000
 udpr:
   address: :5001
+
+schedule:
+  interval: 120
+  buffer: 5
 apiaddr: ":8999"

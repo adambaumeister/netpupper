@@ -22,17 +22,17 @@ type API struct {
 
 	Config    *APIConfig
 	TcpBwAddr string
+	UdpAddr   string
 
 	configFile string
-
-	Schedule *scheduler.TestSchedule
 
 	rw http.ResponseWriter
 }
 type APIConfig struct {
-	Servers []string
-	ApiAddr string
-	Tags    map[string]string
+	Servers  []string
+	ApiAddr  string
+	Schedule *scheduler.TestSchedule
+	Tags     map[string]string
 }
 
 func enableCors(w *http.ResponseWriter) {
@@ -65,16 +65,10 @@ func (a *API) Configure(cf string) bool {
 	if _, err := os.Stat(serverFile); err == nil {
 		data, err := ioutil.ReadFile(serverFile)
 		errors.CheckError(err)
-
 		err = yaml.Unmarshal(data, a.Config)
 		errors.CheckError(err)
-
 		// Initialize the scheduler
-		sch := scheduler.TestSchedule{
-			Interval: 60,
-			Buffer:   5,
-		}
-		a.Schedule = &sch
+		//a.Schedule = &sch
 
 		return true
 
@@ -108,6 +102,7 @@ func (a *API) Run() {
 		fmt.Printf("Start UDPR port: %v\n", us.Config.Address)
 		go us.Run()
 	}
+	a.UdpAddr = us.Config.Address
 
 	fmt.Printf("Started API server on %v\n", a.Config.ApiAddr)
 	a.StartServerApi(a.Config.ApiAddr)
@@ -146,13 +141,27 @@ func (a *API) register(w http.ResponseWriter, r *http.Request) {
 	} else {
 		reg.Server = a.TcpBwAddr
 	}
+
+	// Same but for UDP tests
+	if len(strings.Split(a.UdpAddr, ":")) < 2 {
+		host, _ := os.Hostname()
+		reg.UdpServer = fmt.Sprintf("%v%v", host, a.UdpAddr)
+	} else {
+		reg.UdpServer = a.UdpAddr
+	}
+
+	// Basic
 	reg.ByteCount = "150M"
+	reg.Rate = 1000
+	reg.PacketCount = uint64(10000)
 
-	a.Schedule.ScheduleTest(reg.StartbwTest)
+	sch := a.Config.Schedule
+	sch.ScheduleTest(reg.StartbwTest)
+	sch.ScheduleTest(reg.StartUdpTest)
 	//a.Schedule.ScheduleTest(func() {})
-	a.Schedule.PrintSchedule()
+	sch.PrintSchedule()
 
-	go a.Schedule.Ticker()
+	go sch.Ticker()
 
 	m := Message{
 		Value: fmt.Sprintf("%v registered to controller.", reg.Addr),
@@ -185,10 +194,10 @@ func (a *API) udptest(w http.ResponseWriter, r *http.Request) {
 	fmt.Printf("DEBUG: Got a UDP test request destination: %v\n", cc.Server)
 	ac.SetResponse(w)
 
-	c := udpr.Client{
-		Config: &cc,
-	}
-	c.SetTestCollector(&ac)
+	c := udpr.Client{}
+	c.Configure(a.configFile)
+	c.Config = &cc
+	//c.SetTestCollector(&ac)
 	c.Run()
 }
 
@@ -223,25 +232,6 @@ func (a *API) getclients(w http.ResponseWriter, r *http.Request) {
 	b, err := json.Marshal(a.Controller.Clients)
 	errors.CheckError(err)
 	w.Write(b)
-}
-
-/*
-Start a UDP Reliability test from a client
-*/
-func (a *API) StartUdpTest(addr string, server string, pc uint64, rate int) {
-	cc := udpr.ClientConfig{
-		Server:      server,
-		PacketCount: pc,
-		Rate:        rate,
-	}
-	b, err := json.Marshal(cc)
-	errors.CheckError(err)
-	resp, err := http.Post(fmt.Sprintf("http://%v/udpr", addr), "application/json", bytes.NewBuffer(b))
-	errors.CheckError(err)
-
-	msg := Message{}
-	body, _ := ioutil.ReadAll(resp.Body)
-	json.Unmarshal(body, &msg)
 }
 
 /*

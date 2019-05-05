@@ -57,7 +57,7 @@ func (s *Server) Configure(cf string) bool {
 		errors.CheckError(err)
 
 		if s.Influx != nil {
-			fmt.Printf("Using INFLUXDB as stats collector.\n")
+			fmt.Printf("Using INFLUXDB as stats collector for TCP BW tests.\n")
 			s.testCollector = s.Influx
 		}
 
@@ -205,7 +205,6 @@ func (c *Client) Configure(cf string) bool {
 		errors.CheckError(err)
 
 		if c.Influx != nil {
-			fmt.Printf("Using INFLUXDB as stats collector.\n")
 			host, _ := os.Hostname()
 			c.Tags["name"] = host
 			c.Influx.Tags = c.Tags
