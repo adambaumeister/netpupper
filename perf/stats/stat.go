@@ -124,8 +124,8 @@ func (t *Test) Current() {
 		totalef := 0
 
 		for _, tr := range t.ReliabilityQueue {
-			totalLoss = tr.Loss + totalLoss
-			totalef = tr.EffectiveLoss + totalef
+			totalLoss = tr.Loss
+			totalef = tr.EffectiveLoss
 		}
 		sr := ReliabilityResult{
 			Loss:          totalLoss,
@@ -156,9 +156,10 @@ func (t *Test) Summary() {
 		totalLoss := 0
 		totalef := 0
 
+		// Reliability tests are cumulative so we only need to look at the last one
 		for _, tr := range t.ReliabilityQueue {
-			totalLoss = tr.Loss + totalLoss
-			totalef = tr.EffectiveLoss + totalef
+			totalLoss = tr.Loss
+			totalef = tr.EffectiveLoss
 		}
 		sr := ReliabilitySummaryResult{
 			Loss:          totalLoss,

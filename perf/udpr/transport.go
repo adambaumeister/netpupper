@@ -69,7 +69,7 @@ func (u *UdpTransport) countedRead(uc *net.UDPConn, test *stats.Test) {
 			if count == u.window {
 				loss := len(u.Buffer)
 				ef := len(u.EffectiveLost)
-				fmt.Printf("Loss count: %v\n", loss)
+				fmt.Printf("Lost dg sequence: %v\n", u.CurrentSequence+1)
 				r := stats.ReliabilityResult{
 					Loss:          loss,
 					EffectiveLoss: ef,

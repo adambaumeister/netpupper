@@ -1,9 +1,14 @@
+# DAEMON_SERVER
+# Netpupper SERVER Config.
 tcpbw:
   address: :5000
 udpr:
   address: :5001
 
+# Schedule
 schedule:
+  # How often we run tests
   interval: 120
+  # How much space we leave between tests.
   buffer: 5
 apiaddr: ":8999"
