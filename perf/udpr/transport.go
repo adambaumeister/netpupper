@@ -3,7 +3,6 @@ package udpr
 import (
 	"context"
 	"fmt"
-	"github.com/adamb/netpupper/errors"
 	"github.com/adamb/netpupper/perf/stats"
 	"golang.org/x/time/rate"
 	"net"
@@ -57,33 +56,33 @@ func (u *UdpTransport) countedRead(uc *net.UDPConn, test *stats.Test) {
 		u.conn.SetDeadline(time.Now().Local().Add(u.timeout))
 		_, addr, err := uc.ReadFromUDP(packet)
 		if err != nil {
-			fmt.Printf("Failed read: %v, %v\n", u.CurrentSequence, u.maxlength)
-		}
-		//errors.CheckError(err)
+			fmt.Printf("Failed read(%v): %v, %v\n", err, u.CurrentSequence, u.maxlength)
+		} else {
 
-		h := ReadHeader(packet)
-		if h.PacketType.Value == DG_TYPE {
-			d := ReadDatagram(packet)
-			u.CheckSequence(d)
-			u.CurrentSequence = d.Sequence
-			//fmt.Printf("Seq: %v\n", u.CurrentSequence)
-		}
-		if count == u.window {
-			loss := len(u.Buffer)
-			ef := len(u.EffectiveLost)
-			r := stats.ReliabilityResult{
-				Loss:          loss,
-				EffectiveLoss: ef,
+			h := ReadHeader(packet)
+			if h.PacketType.Value == DG_TYPE {
+				d := ReadDatagram(packet)
+				u.CheckSequence(d)
+				u.CurrentSequence = d.Sequence
+				//fmt.Printf("Seq: %v\n", u.CurrentSequence)
 			}
-			test.InRelTests <- r
-			count = 0
+			if count == u.window {
+				loss := len(u.Buffer)
+				ef := len(u.EffectiveLost)
+				fmt.Printf("Loss count: %v\n", loss)
+				r := stats.ReliabilityResult{
+					Loss:          loss,
+					EffectiveLoss: ef,
+				}
+				test.InRelTests <- r
+				count = 0
 
-			SendAck(uc, addr, uint32(loss), uint32(ef))
+				SendAck(uc, addr, uint32(loss), uint32(ef))
 
+			}
 		}
 		count = count + 1
 	}
-
 }
 
 func (u *UdpTransport) countedSend(test *stats.Test, ratel int) {
@@ -93,6 +92,7 @@ func (u *UdpTransport) countedSend(test *stats.Test, ratel int) {
 	limit := CalcLimiter(ratel)
 	count := uint32(0)
 	for u.CurrentSequence <= u.maxlength {
+		u.conn.SetDeadline(time.Now().Local().Add(u.timeout))
 		limit.Wait(ctx)
 
 		SendDatagram(u.conn, u.CurrentSequence, []byte{1, 1, 1, 1})
@@ -100,12 +100,12 @@ func (u *UdpTransport) countedSend(test *stats.Test, ratel int) {
 		if count == u.window {
 			packet := make([]byte, 1500)
 			_, err := u.conn.Read(packet)
-
-			errors.CheckError(err)
+			if err != nil {
+				fmt.Printf("Failed read(%v): %v, %v\n", err, u.CurrentSequence, u.maxlength)
+			}
 			h := ReadHeader(packet)
 			if h.PacketType.Value == ACK_TYPE {
 				ack := ReadAck(packet)
-				fmt.Printf("Got an ack. Loss: %v\n", ack.Loss)
 				r := stats.ReliabilityResult{
 					Loss:          int(ack.Loss),
 					EffectiveLoss: int(ack.EffectiveLoss),
@@ -123,6 +123,7 @@ func (u *UdpTransport) CheckSequence(d Datagram) {
 	// This is potential loss
 	if d.Sequence > u.CurrentSequence+1 {
 		u.Buffer = append(u.Buffer, d)
+
 	}
 
 	// If the datagram sn is less than what we expect -
